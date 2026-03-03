@@ -1,0 +1,348 @@
+# State PUC Data Sources for Rate Case Tracker
+# All sources are publicly accessible docket search systems
+
+sources:
+  pennsylvania_puc:
+    name: "Pennsylvania Public Utility Commission"
+    abbreviation: "PA PUC"
+    state: "PA"
+    base_url: "https://www.puc.pa.gov"
+    search_url: "https://www.puc.pa.gov/search/document-search/"
+    docket_url_template: "https://www.puc.pa.gov/pcdocs/search-results/?q={docket_number}"
+    description: "Pennsylvania PUC docket system covering electric, gas, water, wastewater, and telecom utilities"
+    docket_format:
+      pattern: "R-\\d{4}-\\d{7}"
+      prefix: "R-"
+      example: "R-2024-3046894"
+      description: "Rate case dockets use the 'R-' prefix followed by year and sequence number"
+    utility_types:
+      - electric
+      - gas
+      - water
+      - wastewater
+      - telecommunications
+    rate_case_search_params:
+      docket_type: "Rate Case"
+      filing_type: "Base Rate"
+    key_fields:
+      - docket_number
+      - utility_name
+      - filing_date
+      - case_type
+      - status
+      - decision_date
+      - revenue_requested
+      - revenue_approved
+    historical_coverage: "2010-present"
+    scrape_strategy: "html_search"
+    notes: >
+      PA PUC has a document search interface. Rate cases are identified by the
+      R- docket prefix. Decision documents (opinions and orders) are PDFs.
+      The search supports filtering by docket type, date range, and utility name.
+
+  oregon_puc:
+    name: "Oregon Public Utility Commission"
+    abbreviation: "OR PUC"
+    state: "OR"
+    base_url: "https://apps.puc.state.or.us"
+    search_url: "https://apps.puc.state.or.us/edockets/"
+    docket_url_template: "https://apps.puc.state.or.us/edockets/docket.asp?DocketID={docket_id}"
+    description: "Oregon PUC EDOCKETS system covering electric, gas, and water utilities"
+    docket_format:
+      pattern: "U[EGW]-\\d{3}"
+      prefixes:
+        electric: "UE"
+        gas: "UG"
+        water: "UW"
+      example: "UE-416"
+      description: "Docket prefix indicates utility type: UE=electric, UG=gas, UW=water"
+    utility_types:
+      - electric
+      - gas
+      - water
+    rate_case_search_params:
+      case_category: "Ratemaking"
+      case_type: "Rate Case"
+    key_fields:
+      - docket_id
+      - utility_name
+      - filing_date
+      - case_type
+      - status
+      - order_date
+      - revenue_requested
+      - revenue_approved
+    historical_coverage: "2005-present"
+    scrape_strategy: "html_table_parse"
+    notes: >
+      Oregon EDOCKETS provides structured docket listings with filing dates,
+      descriptions, and linked PDF documents. Staff reports and commission
+      orders contain revenue requirement details.
+
+  california_cpuc:
+    name: "California Public Utilities Commission"
+    abbreviation: "CA CPUC"
+    state: "CA"
+    base_url: "https://apps.cpuc.ca.gov"
+    search_url: "https://apps.cpuc.ca.gov/apex/f?p=401:56"
+    proceeding_url_template: "https://apps.cpuc.ca.gov/apex/f?p=401:56::::56:P56_PROCEEDING_ID:{proceeding_id}"
+    description: "California CPUC proceedings search covering all regulated utilities"
+    docket_format:
+      pattern: "A\\.\\d{2}-\\d{2}-\\d{3}"
+      prefix: "A."
+      example: "A.23-05-010"
+      description: "Application numbers formatted as A.YY-MM-NNN"
+    utility_types:
+      - electric
+      - gas
+      - water
+      - telecommunications
+    rate_case_search_params:
+      proceeding_type: "Application"
+      industry: "Electric"
+      category: "Ratesetting"
+    key_fields:
+      - proceeding_number
+      - utility_name
+      - filing_date
+      - proceeding_type
+      - status
+      - decision_date
+      - revenue_requested
+      - revenue_approved
+      - rate_base
+    historical_coverage: "2000-present"
+    scrape_strategy: "apex_form_parse"
+    notes: >
+      CPUC uses Oracle APEX for its proceedings search. General Rate Cases (GRC)
+      for large IOUs (PG&E, SCE, SDG&E, SoCalGas) are filed on 3-year cycles.
+      Revenue requirement data is embedded in testimony documents (PDFs).
+      The proceedings search supports filtering by industry, type, and date.
+
+  indiana_iurc:
+    name: "Indiana Utility Regulatory Commission"
+    abbreviation: "IN IURC"
+    state: "IN"
+    base_url: "https://iurc.portal.in.gov"
+    search_url: "https://iurc.portal.in.gov/legal-case-search/"
+    case_url_template: "https://iurc.portal.in.gov/legal-case-search/?causeNo={cause_number}"
+    description: "Indiana IURC case portal covering electric, gas, water, sewer, and telecom"
+    docket_format:
+      pattern: "\\d{5}(-[A-Z]+\\d+)?"
+      prefix: null
+      example: "45990"
+      description: "Cause numbers are plain numeric, sometimes with suffixes"
+    utility_types:
+      - electric
+      - gas
+      - water
+      - sewer
+      - telecommunications
+    rate_case_search_params:
+      case_type: "Rate Case"
+    key_fields:
+      - cause_number
+      - utility_name
+      - filing_date
+      - case_type
+      - status
+      - order_date
+      - revenue_requested
+      - revenue_approved
+    historical_coverage: "2012-present"
+    scrape_strategy: "portal_search"
+    notes: >
+      Indiana IURC portal allows searching by cause number, utility name, and
+      case type. Order documents are PDFs. Some older cases may have limited
+      digital records.
+
+  washington_utc:
+    name: "Washington Utilities and Transportation Commission"
+    abbreviation: "WA UTC"
+    state: "WA"
+    base_url: "https://www.utc.wa.gov"
+    search_url: "https://www.utc.wa.gov/casedocket/"
+    docket_url_template: "https://www.utc.wa.gov/casedocket/{docket_number}/docsets"
+    description: "Washington UTC open docket system covering electric, gas, water, and telecom"
+    docket_format:
+      pattern: "U[EGW]-\\d{6}"
+      prefixes:
+        electric: "UE"
+        gas: "UG"
+        water: "UW"
+      example: "UE-220066"
+      description: "Docket prefix indicates utility type followed by 6-digit case number"
+    utility_types:
+      - electric
+      - gas
+      - water
+      - telecommunications
+    rate_case_search_params:
+      case_type: "General Rate Case"
+      industry: "Electric"
+    key_fields:
+      - docket_number
+      - company_name
+      - service_type
+      - filing_date
+      - order_date
+      - status
+      - revenue_requested
+      - revenue_approved
+    historical_coverage: "2008-present"
+    scrape_strategy: "html_search"
+    notes: >
+      Washington UTC provides a docket search with document sets. Rate case
+      filings include initial filing, staff response, settlement agreements,
+      and final orders. Revenue data is in testimony and order documents.
+
+  connecticut_pura:
+    name: "Connecticut Public Utilities Regulatory Authority"
+    abbreviation: "CT PURA"
+    state: "CT"
+    base_url: "https://www.dpuc.state.ct.us"
+    search_url: "https://www.dpuc.state.ct.us/dockcurr.nsf"
+    docket_url_template: "https://www.dpuc.state.ct.us/dockcurr.nsf/8e6fc37a54110e3e852576190052b64d?SearchView&Query=%5B{docket_number}%5D"
+    description: "Connecticut PURA Lotus Notes/Domino docket system covering electric, gas, water, and telecom utilities"
+    docket_format:
+      pattern: "\\d{2}-\\d{2}-\\d{2}"
+      prefix: null
+      example: "24-10-04"
+      description: "YY-MM-NN format where YY=year, MM=month, NN=sequence within month"
+    utility_types:
+      - electric
+      - gas
+      - water
+      - wastewater
+      - telecommunications
+    rate_case_search_params:
+      search_queries:
+        - "rate+case"
+        - "general+rate+case"
+        - "revenue+requirement"
+        - "rate+increase"
+    key_fields:
+      - docket_number
+      - utility_name
+      - filing_date
+      - case_type
+      - status
+      - utility_type
+    historical_coverage: "2000-present"
+    scrape_strategy: "lotus_notes_search"
+    notes: >
+      CT PURA uses a Lotus Notes/Domino system with SearchView and OpenView APIs.
+      Docket numbers are in bracket format [YY-MM-NN] in search results. Rate cases
+      are identified by keyword search for rate-related terms, validated against
+      known CT utility names.
+
+  georgia_psc:
+    name: "Georgia Public Service Commission"
+    abbreviation: "GA PSC"
+    state: "GA"
+    base_url: "https://psc.ga.gov"
+    search_url: "https://psc.ga.gov/major-cases-heard-by-the-commission/"
+    docket_url_template: "https://psc.ga.gov/search/facts-docket/?docketId={docket_id}"
+    description: "Georgia PSC docket system covering electric, gas, and water utilities"
+    docket_format:
+      pattern: "\\d{5}"
+      prefix: null
+      example: "44280"
+      description: "Five-digit numeric docket IDs"
+    utility_types:
+      - electric
+      - gas
+      - water
+    rate_case_search_params:
+      source: "major_cases_page"
+    key_fields:
+      - docket_number
+      - utility_name
+      - filing_date
+      - case_type
+      - utility_type
+    historical_coverage: "2004-present"
+    scrape_strategy: "drupal_page_parse"
+    notes: >
+      Georgia PSC uses Drupal with a FACTS docket system. Document filing
+      tables load via JavaScript AJAX, but docket titles and IDs are
+      server-rendered. Rate case dockets discovered via the major cases
+      listing page and nearby ID scanning.
+
+  missouri_psc:
+    name: "Missouri Public Service Commission"
+    abbreviation: "MO PSC"
+    state: "MO"
+    base_url: "https://efis.psc.mo.gov"
+    search_url: "https://efis.psc.mo.gov/Case/Display/{case_id}"
+    docket_url_template: "https://efis.psc.mo.gov/Case/Display/{case_id}"
+    description: "Missouri PSC EFIS system covering electric, gas, water, and sewer utilities"
+    docket_format:
+      pattern: "[A-Z]{2}-\\d{4}-\\d{3,5}"
+      prefixes:
+        electric: "ER"
+        gas: "GR"
+        water: "WR"
+        sewer: "SR"
+      example: "ER-2024-0319"
+      description: "Prefix indicates utility type: ER=electric rate, GR=gas rate, WR=water rate, SR=sewer rate"
+    utility_types:
+      - electric
+      - gas
+      - water
+      - wastewater
+    rate_case_search_params:
+      case_prefixes:
+        - "ER-"
+        - "GR-"
+        - "WR-"
+        - "SR-"
+    key_fields:
+      - docket_number
+      - utility_name
+      - filing_date
+      - case_type
+      - utility_type
+      - status
+      - decision_date
+    historical_coverage: "2000-present"
+    scrape_strategy: "efis_id_enumeration"
+    notes: >
+      MO PSC EFIS uses numeric case IDs. Rate cases are discovered by scanning
+      known ID ranges (11100-11450 for ER, 12200-12420 for GR, 17100-17320 for WR)
+      and specific known 2024+ IDs. Case detail pages provide status, utility type,
+      company names, and filing dates.
+
+# Scraping configuration
+scraping:
+  user_agent: "DataFactory/1.0 (PUC-Rate-Tracker; research; contact: nathanmauricegoldberg@gmail.com)"
+  delay_seconds: 2
+  max_retries: 3
+  timeout_seconds: 30
+  cache_dir: "data/raw"
+  respect_robots_txt: true
+
+# Field mapping — maps source-specific field names to canonical schema
+field_mapping:
+  docket_id_fields:
+    - docket_number
+    - docket_id
+    - proceeding_number
+    - cause_number
+  utility_name_fields:
+    - utility_name
+    - company_name
+    - applicant_name
+  filing_date_fields:
+    - filing_date
+    - filed_date
+    - date_filed
+    - application_date
+  decision_date_fields:
+    - decision_date
+    - order_date
+    - final_order_date
+  status_fields:
+    - status
+    - case_status
+    - proceeding_status

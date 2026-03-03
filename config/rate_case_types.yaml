@@ -1,0 +1,346 @@
+# Rate Case Type Classification Rules
+# Used to classify rate case filings by type, utility service, and category
+
+# --- Case Type Classification ---
+# Determines the broad category of the rate case
+
+case_types:
+  general_rate_case:
+    name: "General Rate Case"
+    abbreviation: "GRC"
+    description: "Comprehensive review of a utility's revenue requirements, including all cost categories"
+    docket_patterns:
+      - "(?i)general\\s+rate\\s+case"
+      - "(?i)base\\s+rate"
+      - "(?i)revenue\\s+requirement"
+      - "(?i)GRC"
+    docket_prefixes:
+      pennsylvania: ["R-"]
+      california: ["A."]
+    keywords:
+      - "general rate"
+      - "base rate"
+      - "revenue requirement"
+      - "cost of service"
+      - "rate of return"
+      - "rate base"
+    is_primary: true
+
+  distribution_rate_case:
+    name: "Distribution Rate Case"
+    abbreviation: "DRC"
+    description: "Rate case focused on distribution infrastructure costs (poles, wires, pipes)"
+    docket_patterns:
+      - "(?i)distribution\\s+rate"
+      - "(?i)distribution\\s+revenue"
+      - "(?i)delivery\\s+rate"
+      - "(?i)delivery\\s+service"
+    keywords:
+      - "distribution rate"
+      - "distribution revenue"
+      - "delivery service"
+      - "distribution infrastructure"
+    is_primary: true
+
+  transmission_rate_case:
+    name: "Transmission Rate Case"
+    abbreviation: "TRC"
+    description: "Rate case for transmission system costs (high-voltage lines, substations)"
+    docket_patterns:
+      - "(?i)transmission\\s+rate"
+      - "(?i)transmission\\s+revenue"
+      - "(?i)FERC\\s+formula\\s+rate"
+    keywords:
+      - "transmission rate"
+      - "transmission revenue"
+      - "formula rate"
+      - "transmission infrastructure"
+    is_primary: true
+    notes: "Many transmission rate cases are at FERC, not state PUC level"
+
+  fuel_cost_adjustment:
+    name: "Fuel/Purchased Power Cost Adjustment"
+    abbreviation: "FCA"
+    description: "Adjustment to pass through changes in fuel or purchased power costs"
+    docket_patterns:
+      - "(?i)fuel\\s+(cost|clause|adjustment|factor)"
+      - "(?i)purchased\\s+(power|gas)\\s+(cost|adjustment)"
+      - "(?i)energy\\s+cost\\s+(recovery|adjustment)"
+      - "(?i)power\\s+cost\\s+adjustment"
+      - "(?i)PCA"
+      - "(?i)FAC"
+      - "(?i)ECA"
+    keywords:
+      - "fuel cost"
+      - "fuel clause"
+      - "purchased power"
+      - "energy cost recovery"
+      - "power cost adjustment"
+    is_primary: false
+
+  infrastructure_rider:
+    name: "Infrastructure Rider/Surcharge"
+    abbreviation: "IR"
+    description: "Mechanism for accelerated recovery of infrastructure replacement costs"
+    docket_patterns:
+      - "(?i)(infrastructure|system)\\s+(improvement|replacement|investment)\\s+(charge|rider|surcharge)"
+      - "(?i)DISC"
+      - "(?i)DSIC"
+      - "(?i)pipe\\s+replacement"
+      - "(?i)accelerated\\s+infrastructure"
+    keywords:
+      - "infrastructure rider"
+      - "system improvement"
+      - "DSIC"
+      - "pipe replacement"
+      - "accelerated infrastructure"
+    is_primary: false
+
+  decoupling_mechanism:
+    name: "Revenue Decoupling Mechanism"
+    abbreviation: "RDM"
+    description: "Mechanism to separate utility revenue from sales volume"
+    docket_patterns:
+      - "(?i)(revenue\\s+)?decoupling"
+      - "(?i)lost\\s+revenue\\s+adjustment"
+      - "(?i)weather\\s+normalization"
+      - "(?i)LRAM"
+    keywords:
+      - "decoupling"
+      - "lost revenue adjustment"
+      - "weather normalization"
+      - "conservation incentive"
+    is_primary: false
+
+  rate_design:
+    name: "Rate Design"
+    abbreviation: "RD"
+    description: "Proceeding focused on how rates are structured across customer classes"
+    docket_patterns:
+      - "(?i)rate\\s+design"
+      - "(?i)rate\\s+structure"
+      - "(?i)class\\s+cost\\s+(of\\s+service|allocation)"
+      - "(?i)time[- ]of[- ]use"
+      - "(?i)demand\\s+charge"
+    keywords:
+      - "rate design"
+      - "rate structure"
+      - "class cost of service"
+      - "time-of-use"
+      - "demand charge"
+    is_primary: false
+
+# --- Utility Service Type Classification ---
+# Determines whether the utility is electric, gas, water, etc.
+
+service_types:
+  electric:
+    name: "Electric"
+    docket_patterns:
+      - "(?i)electric"
+      - "(?i)power\\s+company"
+      - "(?i)light\\s+(and|&)\\s+(power|company)"
+      - "(?i)edison"
+      - "(?i)illuminating"
+    docket_prefixes:
+      oregon: "UE"
+      washington: "UE"
+    keywords:
+      - "electric"
+      - "power"
+      - "kilowatt"
+      - "kWh"
+      - "generation"
+      - "transmission"
+      - "distribution"
+
+  natural_gas:
+    name: "Natural Gas"
+    docket_patterns:
+      - "(?i)(natural\\s+)?gas"
+      - "(?i)gas\\s+(company|utility|distribution)"
+    docket_prefixes:
+      oregon: "UG"
+      washington: "UG"
+    keywords:
+      - "natural gas"
+      - "gas distribution"
+      - "therm"
+      - "Mcf"
+      - "pipeline"
+
+  water:
+    name: "Water"
+    docket_patterns:
+      - "(?i)water\\s+(company|utility|service|works)"
+      - "(?i)aqua"
+    docket_prefixes:
+      oregon: "UW"
+      washington: "UW"
+    keywords:
+      - "water"
+      - "drinking water"
+      - "water service"
+      - "gallons"
+
+  wastewater:
+    name: "Wastewater/Sewer"
+    docket_patterns:
+      - "(?i)(waste)?water\\s+treatment"
+      - "(?i)sewer"
+      - "(?i)sanitary"
+    keywords:
+      - "wastewater"
+      - "sewer"
+      - "sanitary"
+      - "treatment"
+
+  telecommunications:
+    name: "Telecommunications"
+    docket_patterns:
+      - "(?i)telecom"
+      - "(?i)telephone"
+      - "(?i)communications"
+    keywords:
+      - "telecommunications"
+      - "telephone"
+      - "broadband"
+      - "communications"
+
+  multi_service:
+    name: "Multi-Service (Combination Utility)"
+    docket_patterns:
+      - "(?i)combined\\s+(electric|gas)"
+      - "(?i)(electric|gas)\\s+and\\s+(electric|gas)"
+    keywords:
+      - "combination utility"
+      - "electric and gas"
+    notes: "Some utilities provide both electric and gas service under one tariff"
+
+# --- Utility Ownership Type Classification ---
+# Determines whether the utility is investor-owned, municipal, cooperative, etc.
+
+ownership_types:
+  investor_owned:
+    name: "Investor-Owned Utility (IOU)"
+    description: "Privately owned, for-profit utility regulated by state PUC"
+    name_patterns:
+      - "(?i)(inc\\.|incorporated|corp\\.|corporation|company|co\\.)"
+    known_utilities:
+      - "Pacific Gas and Electric Company"
+      - "Southern California Edison Company"
+      - "San Diego Gas & Electric Company"
+      - "PPL Electric Utilities"
+      - "PECO Energy Company"
+      - "Duquesne Light Company"
+      - "Portland General Electric"
+      - "PacifiCorp"
+      - "Indiana Michigan Power"
+      - "Duke Energy Indiana"
+      - "Puget Sound Energy"
+      - "Avista Corporation"
+    notes: "IOUs are the primary filers of rate cases at state PUCs"
+
+  municipal:
+    name: "Municipal Utility"
+    description: "Owned by a city or town government"
+    name_patterns:
+      - "(?i)(city|town|village|borough|municipal)\\s+of"
+      - "(?i)municipal\\s+(electric|gas|water|utility|light)"
+    notes: "Municipal utilities are generally not regulated by state PUCs; rarely appear in docket systems"
+
+  cooperative:
+    name: "Electric Cooperative"
+    description: "Member-owned, not-for-profit utility"
+    name_patterns:
+      - "(?i)(cooperative|co-op|coop)"
+      - "(?i)rural\\s+electric"
+      - "(?i)REC$"
+    notes: "Cooperatives may or may not be state PUC-regulated depending on the state"
+
+# --- Case Status Classification ---
+# Standardized status values across all state PUC systems
+
+case_statuses:
+  filed:
+    name: "Filed"
+    description: "Application or petition has been filed but not yet fully processed"
+    source_patterns:
+      - "(?i)^filed$"
+      - "(?i)^new$"
+      - "(?i)^pending\\s+review$"
+      - "(?i)^received$"
+
+  active:
+    name: "Active"
+    description: "Case is actively being reviewed, hearings or briefing in progress"
+    source_patterns:
+      - "(?i)^active$"
+      - "(?i)^open$"
+      - "(?i)^in\\s+progress$"
+      - "(?i)^under\\s+review$"
+      - "(?i)^hearing$"
+      - "(?i)^briefing$"
+
+  settled:
+    name: "Settled"
+    description: "Parties reached a settlement agreement, pending commission approval"
+    source_patterns:
+      - "(?i)settl"
+      - "(?i)stipulat"
+      - "(?i)agreement"
+
+  decided:
+    name: "Decided"
+    description: "Commission has issued a final order"
+    source_patterns:
+      - "(?i)^decided$"
+      - "(?i)^closed$"
+      - "(?i)^final\\s+order$"
+      - "(?i)^decision\\s+issued$"
+      - "(?i)^order\\s+issued$"
+      - "(?i)^completed$"
+      - "(?i)^resolved$"
+
+  withdrawn:
+    name: "Withdrawn"
+    description: "Utility withdrew its filing"
+    source_patterns:
+      - "(?i)withdrawn"
+      - "(?i)dismissed"
+      - "(?i)cancelled"
+      - "(?i)vacated"
+
+  suspended:
+    name: "Suspended"
+    description: "Case proceedings have been suspended"
+    source_patterns:
+      - "(?i)suspended"
+      - "(?i)stayed"
+      - "(?i)abeyance"
+
+# --- Revenue Amount Extraction Patterns ---
+# Regex patterns for extracting dollar amounts from filings and orders
+
+revenue_patterns:
+  dollar_amount:
+    patterns:
+      - "\\$([\\d,]+(?:\\.\\d{2})?)"
+      - "\\$([\\d,]+(?:\\.\\d{1,2})?)\\s*(million|billion|M|B)"
+    multipliers:
+      million: 1000000
+      billion: 1000000000
+      M: 1000000
+      B: 1000000000
+  revenue_request_context:
+    patterns:
+      - "(?i)request(?:ed|ing)?\\s+(?:a\\s+)?(?:revenue\\s+)?(?:increase|decrease)\\s+of\\s+\\$"
+      - "(?i)(?:revenue\\s+)?(?:increase|decrease)\\s+(?:of\\s+)?\\$"
+      - "(?i)annual\\s+revenue\\s+(?:increase|decrease|change|requirement)\\s+of\\s+\\$"
+      - "(?i)seeks?\\s+(?:a\\s+)?(?:rate|revenue)\\s+(?:increase|decrease)\\s+of\\s+\\$"
+  revenue_approved_context:
+    patterns:
+      - "(?i)approv(?:ed|ing)\\s+(?:a\\s+)?(?:revenue\\s+)?(?:increase|decrease)\\s+of\\s+\\$"
+      - "(?i)authoriz(?:ed|ing)\\s+(?:a\\s+)?(?:revenue\\s+)?(?:increase|decrease)\\s+of\\s+\\$"
+      - "(?i)grant(?:ed|ing)\\s+(?:a\\s+)?(?:revenue\\s+)?(?:increase|decrease)\\s+of\\s+\\$"
+      - "(?i)final\\s+(?:revenue\\s+)?(?:increase|decrease)\\s+of\\s+\\$"

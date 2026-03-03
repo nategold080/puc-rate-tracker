@@ -1,0 +1,516 @@
+# Utility Name Aliases and Parent Company Mappings
+# Used for entity resolution across state PUC systems
+
+# Maps raw utility names to canonical names
+canonical_names:
+  # Pennsylvania utilities
+  "PPL Electric Utilities":
+    canonical: "PPL Electric Utilities Corporation"
+    parent: "PPL Corporation"
+    aliases:
+      - "PPL Electric Utilities Corporation"
+      - "PPL Electric Utilities Corp."
+      - "PPL Electric Utilities Corp"
+      - "PPL EU"
+      - "PPL Electric"
+    utility_type: "electric"
+    state: "PA"
+
+  "PECO Energy":
+    canonical: "PECO Energy Company"
+    parent: "Exelon Corporation"
+    aliases:
+      - "PECO Energy Company"
+      - "PECO Energy Co."
+      - "PECO"
+    utility_type: "electric"
+    state: "PA"
+
+  "Duquesne Light":
+    canonical: "Duquesne Light Company"
+    parent: "Duquesne Light Holdings Inc."
+    aliases:
+      - "Duquesne Light Company"
+      - "Duquesne Light Co."
+      - "DLC"
+      - "Duquesne Light Co"
+    utility_type: "electric"
+    state: "PA"
+
+  "Philadelphia Gas Works":
+    canonical: "Philadelphia Gas Works"
+    parent: null
+    aliases:
+      - "Philadelphia Gas Works"
+      - "PGW"
+    utility_type: "gas"
+    state: "PA"
+
+  "Columbia Gas of PA":
+    canonical: "Columbia Gas of Pennsylvania Inc."
+    parent: "NiSource Inc."
+    aliases:
+      - "Columbia Gas of Pennsylvania Inc."
+      - "Columbia Gas of Pennsylvania"
+      - "Columbia Gas of PA"
+      - "Columbia Gas PA"
+      - "CPA"
+    utility_type: "gas"
+    state: "PA"
+
+  "UGI Utilities":
+    canonical: "UGI Utilities Inc."
+    parent: "UGI Corporation"
+    aliases:
+      - "UGI Utilities Inc."
+      - "UGI Utilities"
+      - "UGI Utilities Inc. - Gas Division"
+      - "UGI Utilities Inc. - Electric Division"
+      - "UGI Gas"
+      - "UGI Electric"
+    utility_type: "gas"
+    state: "PA"
+
+  "National Fuel Gas Distribution":
+    canonical: "National Fuel Gas Distribution Corporation"
+    parent: "National Fuel Gas Company"
+    aliases:
+      - "National Fuel Gas Distribution Corporation"
+      - "National Fuel Gas Distribution Corp."
+      - "National Fuel Gas Distribution Corp"
+      - "NFG Distribution"
+      - "National Fuel Gas"
+    utility_type: "gas"
+    state: "PA"
+
+  "Aqua Pennsylvania":
+    canonical: "Aqua Pennsylvania Inc."
+    parent: "Essential Utilities Inc."
+    aliases:
+      - "Aqua Pennsylvania Inc."
+      - "Aqua Pennsylvania"
+      - "Aqua PA"
+    utility_type: "water"
+    state: "PA"
+
+  "Pennsylvania American Water":
+    canonical: "Pennsylvania American Water Company"
+    parent: "American Water Works Company Inc."
+    aliases:
+      - "Pennsylvania American Water Company"
+      - "Pennsylvania American Water"
+      - "PA American Water"
+      - "PAWC"
+    utility_type: "water"
+    state: "PA"
+
+  "Peoples Natural Gas":
+    canonical: "Peoples Natural Gas Company"
+    parent: "Essential Utilities Inc."
+    aliases:
+      - "Peoples Natural Gas Company"
+      - "Peoples Natural Gas"
+      - "Peoples Gas"
+      - "PNG"
+    utility_type: "gas"
+    state: "PA"
+
+  # California utilities
+  "PG&E":
+    canonical: "Pacific Gas and Electric Company"
+    parent: "PG&E Corporation"
+    aliases:
+      - "Pacific Gas and Electric Company"
+      - "Pacific Gas & Electric Company"
+      - "Pacific Gas & Electric"
+      - "Pacific Gas and Electric"
+      - "PG&E"
+      - "PGE"
+    utility_type: "electric"
+    state: "CA"
+
+  "SCE":
+    canonical: "Southern California Edison Company"
+    parent: "Edison International"
+    aliases:
+      - "Southern California Edison Company"
+      - "Southern California Edison"
+      - "So. Cal. Edison"
+      - "SoCal Edison"
+      - "SCE"
+    utility_type: "electric"
+    state: "CA"
+
+  "SDG&E":
+    canonical: "San Diego Gas & Electric Company"
+    parent: "Sempra Energy"
+    aliases:
+      - "San Diego Gas & Electric Company"
+      - "San Diego Gas and Electric Company"
+      - "San Diego Gas & Electric"
+      - "SDG&E"
+      - "SDGE"
+    utility_type: "electric"
+    state: "CA"
+
+  "SoCalGas":
+    canonical: "Southern California Gas Company"
+    parent: "Sempra Energy"
+    aliases:
+      - "Southern California Gas Company"
+      - "Southern California Gas"
+      - "So. Cal. Gas"
+      - "SoCalGas"
+      - "SCG"
+    utility_type: "gas"
+    state: "CA"
+
+  "Cal Water":
+    canonical: "California Water Service Company"
+    parent: "California Water Service Group"
+    aliases:
+      - "California Water Service Company"
+      - "California Water Service"
+      - "Cal Water"
+      - "CalWater"
+      - "CWS"
+    utility_type: "water"
+    state: "CA"
+
+  # Oregon utilities
+  "Portland General Electric":
+    canonical: "Portland General Electric Company"
+    parent: "Portland General Electric Company"
+    aliases:
+      - "Portland General Electric Company"
+      - "Portland General Electric"
+      - "PGE"
+      - "PGE Oregon"
+    utility_type: "electric"
+    state: "OR"
+
+  "PacifiCorp Oregon":
+    canonical: "PacifiCorp dba Pacific Power"
+    parent: "Berkshire Hathaway Energy"
+    aliases:
+      - "PacifiCorp"
+      - "PacifiCorp dba Pacific Power"
+      - "Pacific Power"
+      - "Pacific Power & Light"
+      - "PacifiCorp dba Pacific Power & Light"
+    utility_type: "electric"
+    state: "OR"
+
+  "NW Natural":
+    canonical: "NW Natural Gas Company"
+    parent: "Northwest Natural Holding Company"
+    aliases:
+      - "NW Natural Gas Company"
+      - "NW Natural"
+      - "Northwest Natural Gas"
+      - "Northwest Natural"
+    utility_type: "gas"
+    state: "OR"
+
+  "Avista Oregon":
+    canonical: "Avista Corporation dba Avista Utilities"
+    parent: "Avista Corporation"
+    aliases:
+      - "Avista Corporation dba Avista Utilities"
+      - "Avista Corporation"
+      - "Avista Utilities"
+      - "Avista"
+    utility_type: "gas"
+    state: "OR"
+
+  # Indiana utilities
+  "Duke Energy Indiana":
+    canonical: "Duke Energy Indiana LLC"
+    parent: "Duke Energy Corporation"
+    aliases:
+      - "Duke Energy Indiana LLC"
+      - "Duke Energy Indiana"
+      - "DEI"
+    utility_type: "electric"
+    state: "IN"
+
+  "Indiana Michigan Power":
+    canonical: "Indiana Michigan Power Company"
+    parent: "American Electric Power Company"
+    aliases:
+      - "Indiana Michigan Power Company"
+      - "Indiana Michigan Power"
+      - "I&M"
+      - "AEP Indiana Michigan"
+    utility_type: "electric"
+    state: "IN"
+
+  "CenterPoint Indiana":
+    canonical: "CenterPoint Energy Indiana South"
+    parent: "CenterPoint Energy Inc."
+    aliases:
+      - "CenterPoint Energy Indiana South"
+      - "CenterPoint Energy Indiana"
+      - "CenterPoint Indiana"
+      - "Vectren South"
+    utility_type: "gas"
+    state: "IN"
+
+  "Indiana American Water":
+    canonical: "Indiana American Water Company Inc."
+    parent: "American Water Works Company Inc."
+    aliases:
+      - "Indiana American Water Company Inc."
+      - "Indiana American Water Company"
+      - "Indiana American Water"
+    utility_type: "water"
+    state: "IN"
+
+  "Indianapolis Power & Light":
+    canonical: "Indianapolis Power & Light Company"
+    parent: "AES Corporation"
+    aliases:
+      - "Indianapolis Power & Light Company"
+      - "Indianapolis Power and Light Company"
+      - "Indianapolis Power & Light"
+      - "IPL"
+      - "AES Indiana"
+    utility_type: "electric"
+    state: "IN"
+
+  # Washington utilities
+  "Puget Sound Energy":
+    canonical: "Puget Sound Energy"
+    parent: "Puget Energy Inc."
+    aliases:
+      - "Puget Sound Energy"
+      - "PSE"
+      - "Puget Sound Energy Inc."
+    utility_type: "electric"
+    state: "WA"
+
+  "Avista Washington":
+    canonical: "Avista Corporation"
+    parent: "Avista Corporation"
+    aliases:
+      - "Avista Corporation"
+      - "Avista Utilities"
+      - "Avista"
+    utility_type: "electric"
+    state: "WA"
+
+  "PacifiCorp Washington":
+    canonical: "PacifiCorp dba Pacific Power & Light"
+    parent: "Berkshire Hathaway Energy"
+    aliases:
+      - "PacifiCorp dba Pacific Power & Light"
+      - "PacifiCorp"
+      - "Pacific Power & Light"
+      - "Pacific Power"
+    utility_type: "electric"
+    state: "WA"
+
+  "Cascade Natural Gas":
+    canonical: "Cascade Natural Gas Corporation"
+    parent: "MDU Resources Group Inc."
+    aliases:
+      - "Cascade Natural Gas Corporation"
+      - "Cascade Natural Gas"
+      - "Cascade Gas"
+      - "CNG"
+    utility_type: "gas"
+    state: "WA"
+
+  # Connecticut utilities
+  "Eversource Energy":
+    canonical: "Eversource Energy"
+    parent: "Eversource Energy"
+    aliases:
+      - "Eversource"
+      - "Eversource Energy Service Company"
+    utility_type: "electric"
+    state: "CT"
+
+  "Connecticut Light and Power":
+    canonical: "Connecticut Light and Power Company"
+    parent: "Eversource Energy"
+    aliases:
+      - "Connecticut Light and Power Company"
+      - "Connecticut Light & Power"
+      - "CL&P"
+    utility_type: "electric"
+    state: "CT"
+
+  "United Illuminating":
+    canonical: "United Illuminating Company"
+    parent: "Avangrid Inc."
+    aliases:
+      - "United Illuminating Company"
+      - "The United Illuminating Company"
+      - "UI"
+    utility_type: "electric"
+    state: "CT"
+
+  "Connecticut Natural Gas":
+    canonical: "Connecticut Natural Gas Corporation"
+    parent: "Avangrid Inc."
+    aliases:
+      - "Connecticut Natural Gas Corporation"
+      - "Connecticut Natural Gas Corp."
+      - "CNG"
+    utility_type: "gas"
+    state: "CT"
+
+  "Southern Connecticut Gas":
+    canonical: "Southern Connecticut Gas Company"
+    parent: "Avangrid Inc."
+    aliases:
+      - "Southern Connecticut Gas Company"
+      - "SCG"
+    utility_type: "gas"
+    state: "CT"
+
+  "Yankee Gas Services":
+    canonical: "Yankee Gas Services Company"
+    parent: "Eversource Energy"
+    aliases:
+      - "Yankee Gas Services Company"
+      - "Yankee Gas"
+      - "YGS"
+    utility_type: "gas"
+    state: "CT"
+
+  "Aquarion Water":
+    canonical: "Aquarion Water Company"
+    parent: "Eversource Energy"
+    aliases:
+      - "Aquarion Water Company"
+      - "Aquarion Water Company of Connecticut"
+    utility_type: "water"
+    state: "CT"
+
+  # Missouri utilities
+  "Ameren Missouri":
+    canonical: "Ameren Missouri"
+    parent: "Ameren Corporation"
+    aliases:
+      - "Union Electric Company"
+      - "AmerenUE"
+      - "Ameren Missouri (Union Electric)"
+    utility_type: "electric"
+    state: "MO"
+
+  "Evergy Missouri West":
+    canonical: "Evergy Missouri West Inc."
+    parent: "Evergy Inc."
+    aliases:
+      - "Evergy Missouri West Inc."
+      - "Evergy Missouri West"
+      - "KCP&L Greater Missouri Operations"
+      - "GMO"
+    utility_type: "electric"
+    state: "MO"
+
+  "Evergy Metro":
+    canonical: "Evergy Metro Inc."
+    parent: "Evergy Inc."
+    aliases:
+      - "Evergy Metro Inc."
+      - "Evergy Metro"
+      - "KCP&L"
+      - "Kansas City Power & Light"
+      - "Kansas City Power and Light"
+    utility_type: "electric"
+    state: "MO"
+
+  "Empire District Electric":
+    canonical: "Empire District Electric Company"
+    parent: "Liberty Utilities"
+    aliases:
+      - "Empire District Electric Company"
+      - "The Empire District Electric Company"
+      - "Liberty-Empire"
+    utility_type: "electric"
+    state: "MO"
+
+  "Spire Missouri":
+    canonical: "Spire Missouri Inc."
+    parent: "Spire Inc."
+    aliases:
+      - "Spire Missouri Inc."
+      - "Spire Missouri"
+      - "Laclede Gas Company"
+      - "Laclede Gas"
+      - "Missouri Gas Energy"
+      - "Spire"
+    utility_type: "gas"
+    state: "MO"
+
+  "Atmos Energy Missouri":
+    canonical: "Atmos Energy Corporation"
+    parent: "Atmos Energy Corporation"
+    aliases:
+      - "Atmos Energy"
+      - "Atmos Energy Corporation"
+    utility_type: "gas"
+    state: "MO"
+
+  # Georgia utilities
+  "Georgia Power":
+    canonical: "Georgia Power Company"
+    parent: "Southern Company"
+    aliases:
+      - "Georgia Power Company"
+      - "Georgia Power Co."
+    utility_type: "electric"
+    state: "GA"
+
+  "Atlanta Gas Light":
+    canonical: "Atlanta Gas Light Company"
+    parent: "Southern Company Gas"
+    aliases:
+      - "Atlanta Gas Light Company"
+      - "Atlanta Gas Light Co."
+      - "AGL"
+    utility_type: "gas"
+    state: "GA"
+
+# Common suffixes to strip during normalization
+strip_suffixes:
+  - "Inc."
+  - "Inc"
+  - "Corporation"
+  - "Corp."
+  - "Corp"
+  - "Company"
+  - "Co."
+  - "Co"
+  - "LLC"
+  - "LP"
+  - "L.P."
+  - "LLP"
+  - "Ltd."
+  - "Ltd"
+  - "Limited"
+
+# Common abbreviation expansions
+abbreviation_expansions:
+  "&": "and"
+  "Elec.": "Electric"
+  "Utils.": "Utilities"
+  "Util.": "Utility"
+  "So.": "Southern"
+  "No.": "Northern"
+  "Cal.": "California"
+  "Penn.": "Pennsylvania"
+  "Ind.": "Indiana"
+  "Wash.": "Washington"
+  "Ore.": "Oregon"
+  "Dist.": "Distribution"
+  "Nat.": "Natural"
+
+# Fuzzy matching settings
+fuzzy_match:
+  algorithm: "token_sort_ratio"
+  threshold: 85
+  min_length: 3

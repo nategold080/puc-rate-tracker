@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "puc-rate-tracker"
+version = "0.1.0"
+description = "Cross-linked database of utility rate case filings and decisions across state public utility commissions"
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [
+    {name = "Nathan Goldberg", email = "nathanmauricegoldberg@gmail.com"}
+]
+
+[project.scripts]
+puc-rate-tracker = "src.cli:cli"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
