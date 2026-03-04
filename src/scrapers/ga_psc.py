@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 import re
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -255,7 +255,7 @@ def _fetch_docket_page(client: httpx.Client, docket_id: int) -> Optional[dict]:
             "filing_date": filing_date,
             "description": title[:500],
             "source_url": f"{BASE_URL}/search/facts-docket/?docketId={docket_id}",
-            "scraped_at": datetime.now(timezone.utc).isoformat(),
+            "scraped_at": datetime.utcnow().isoformat(),
         }
 
     except httpx.HTTPError:

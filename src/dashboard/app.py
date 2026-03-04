@@ -27,16 +27,41 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.storage.database import (
-    get_all_rate_cases,
-    get_all_utilities,
-    get_connection,
-    get_documents_for_docket,
-    get_rate_case_by_docket,
-    get_stats,
-    init_db,
-    DB_PATH,
-)
+try:
+    from src.storage.database import (
+        get_all_rate_cases,
+        get_all_utilities,
+        get_connection,
+        get_documents_for_docket,
+        get_rate_case_by_docket,
+        get_stats,
+        get_enrichment_stats,
+        get_utility_operations,
+        get_utility_emissions,
+        get_utility_capacity,
+        get_rate_case_impacts,
+        get_utility_eia_links,
+        init_db,
+        DB_PATH,
+    )
+    _DB_IMPORTS_OK = True
+except ImportError:
+    _DB_IMPORTS_OK = False
+    DB_PATH = PROJECT_ROOT / "data" / "puc_rate_cases.db"
+
+    def init_db(): pass
+    def get_connection(): return None
+    def get_all_rate_cases(**kw): return []
+    def get_all_utilities(**kw): return []
+    def get_stats(**kw): return {}
+    def get_enrichment_stats(**kw): return {}
+    def get_utility_operations(**kw): return []
+    def get_utility_emissions(**kw): return []
+    def get_utility_capacity(**kw): return []
+    def get_rate_case_impacts(**kw): return []
+    def get_utility_eia_links(**kw): return []
+    def get_documents_for_docket(**kw): return []
+    def get_rate_case_by_docket(**kw): return None
 
 
 # --- Page Config ---
@@ -101,26 +126,57 @@ st.markdown("""
 @st.cache_data(ttl=300)
 def load_data():
     """Load all rate case data from the database."""
-    if not DB_PATH.exists():
-        init_db()
+    try:
+        if not DB_PATH.exists():
+            init_db()
 
-    conn = get_connection()
-    cases = get_all_rate_cases(limit=10000, conn=conn)
-    utilities = get_all_utilities(conn=conn)
-    stats = get_stats(conn=conn, print_output=False)
-    conn.close()
+        conn = get_connection()
+        if conn is None:
+            return pd.DataFrame(), [], {}, {}, pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), []
 
-    df = pd.DataFrame(cases) if cases else pd.DataFrame()
+        cases = get_all_rate_cases(limit=10000, conn=conn)
+        utilities = get_all_utilities(conn=conn)
+        stats = get_stats(conn=conn, print_output=False)
 
-    if not df.empty:
-        df["filing_date"] = pd.to_datetime(df["filing_date"], errors="coerce")
-        df["decision_date"] = pd.to_datetime(df["decision_date"], errors="coerce")
-        df["display_name"] = df["canonical_utility_name"].fillna(df["utility_name"])
+        # Load enrichment data
+        try:
+            e_stats = get_enrichment_stats(conn=conn)
+            operations = get_utility_operations(conn=conn)
+            emissions = get_utility_emissions(conn=conn)
+            capacity = get_utility_capacity(conn=conn)
+            impacts = get_rate_case_impacts(conn=conn)
+            eia_links = get_utility_eia_links(conn=conn)
+        except Exception:
+            e_stats = {}
+            operations = []
+            emissions = []
+            capacity = []
+            impacts = []
+            eia_links = []
 
-    return df, utilities, stats
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+        df = pd.DataFrame(cases) if cases else pd.DataFrame()
+
+        if not df.empty:
+            df["filing_date"] = pd.to_datetime(df["filing_date"], errors="coerce")
+            df["decision_date"] = pd.to_datetime(df["decision_date"], errors="coerce")
+            df["display_name"] = df["canonical_utility_name"].fillna(df["utility_name"])
+
+        ops_df = pd.DataFrame(operations) if operations else pd.DataFrame()
+        emi_df = pd.DataFrame(emissions) if emissions else pd.DataFrame()
+        cap_df = pd.DataFrame(capacity) if capacity else pd.DataFrame()
+        imp_df = pd.DataFrame(impacts) if impacts else pd.DataFrame()
+
+        return df, utilities, stats, e_stats, ops_df, emi_df, cap_df, imp_df, eia_links
+    except Exception:
+        return pd.DataFrame(), [], {}, {}, pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), []
 
 
-df, utilities, stats = load_data()
+df, utilities, stats, e_stats, ops_df, emi_df, cap_df, imp_df, eia_links = load_data()
 
 
 # --- Sidebar ---
@@ -138,6 +194,10 @@ section = st.sidebar.radio(
         "Rate Case Explorer",
         "Utility Analysis",
         "Rate Change Tracker",
+        "Utility Profiles",
+        "Consumer Impact",
+        "Environmental Impact",
+        "Capacity & Infrastructure",
         "Geographic Map",
         "Timeline View",
         "Case Deep Dive",
@@ -147,11 +207,22 @@ section = st.sidebar.radio(
 
 st.sidebar.markdown("---")
 st.sidebar.markdown(
-    "**Data Sources:** OR PUC, MO PSC, CT PURA, GA PSC, PA PUC, CA CPUC, IN IURC, WA UTC"
+    "**Data Sources:** OR PUC, MO PSC, CT PURA, GA PSC, PA PUC, CA CPUC, IN IURC, WA UTC + EIA + EPA eGRID"
 )
-if stats:
-    st.sidebar.metric("Total Records", stats.get("total_rate_cases", 0))
-    st.sidebar.metric("States Covered", len(stats.get("by_state", {})))
+_total_records = stats.get("total_rate_cases", 0) if stats else 0
+_states_covered = len(stats.get("by_state", {})) if stats else 0
+if _total_records > 0:
+    st.sidebar.metric("Total Records", _total_records)
+    st.sidebar.metric("States Covered", _states_covered)
+    if e_stats:
+        linked = e_stats.get("linked_utilities", 0)
+        if linked:
+            st.sidebar.metric("Utilities Linked to EIA", linked)
+        emi = e_stats.get("emissions_records", 0)
+        if emi:
+            st.sidebar.metric("Emissions Records", emi)
+else:
+    st.sidebar.info("No data loaded yet. Run the pipeline to populate.")
 
 
 # --- Helper Functions ---
@@ -503,7 +574,289 @@ elif section == "Rate Change Tracker":
 
 
 # ============================================================
-# SECTION 5: GEOGRAPHIC MAP
+# SECTION 5: UTILITY PROFILES (EIA 861)
+# ============================================================
+
+elif section == "Utility Profiles":
+    st.markdown('<div class="main-header">Utility Profiles</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="sub-header">EIA Form 861 operational data — customers, revenue, pricing</div>',
+        unsafe_allow_html=True,
+    )
+
+    if ops_df.empty:
+        st.warning("No EIA 861 data loaded. Run: `python3 -m src.cli enrich`")
+    else:
+        # KPIs
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.markdown(make_kpi_card(f"{ops_df['eia_utility_id'].nunique():,}", "EIA Utilities"), unsafe_allow_html=True)
+        with col2:
+            total_cust = ops_df.groupby("eia_utility_id")["total_customers"].max().sum()
+            st.markdown(make_kpi_card(f"{total_cust / 1e6:,.1f}M", "Total Customers"), unsafe_allow_html=True)
+        with col3:
+            avg_price = ops_df["residential_avg_price"].dropna().mean()
+            st.markdown(make_kpi_card(f"{avg_price:.1f}¢", "Avg Res. Price"), unsafe_allow_html=True)
+        with col4:
+            total_rev = ops_df.groupby("eia_utility_id")["total_revenue"].max().sum()
+            st.markdown(make_kpi_card(f"${total_rev / 1e6:,.0f}B", "Total Revenue"), unsafe_allow_html=True)
+
+        st.markdown("---")
+
+        # Ownership type breakdown
+        col_left, col_right = st.columns(2)
+        with col_left:
+            st.subheader("Utilities by Ownership Type")
+            own_counts = ops_df.drop_duplicates("eia_utility_id")["ownership_type"].value_counts().reset_index()
+            own_counts.columns = ["Type", "Count"]
+            fig = px.pie(own_counts, values="Count", names="Type", color_discrete_sequence=BLUE_PALETTE, hole=0.4)
+            fig.update_layout(**PLOTLY_LAYOUT)
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col_right:
+            st.subheader("Residential Price by State")
+            if "state" in ops_df.columns:
+                state_price = ops_df.dropna(subset=["residential_avg_price"]).groupby("state")["residential_avg_price"].mean().sort_values(ascending=False).head(20).reset_index()
+                state_price.columns = ["State", "Avg Price (¢/kWh)"]
+                fig = px.bar(state_price, x="State", y="Avg Price (¢/kWh)", color="Avg Price (¢/kWh)",
+                             color_continuous_scale=["#003D73", "#0984E3", "#FF6B6B"])
+                fig.update_layout(**PLOTLY_LAYOUT)
+                st.plotly_chart(fig, use_container_width=True)
+
+        # Top utilities by customer count
+        st.subheader("Largest Utilities by Customer Count")
+        latest_year = ops_df["year"].max()
+        latest = ops_df[ops_df["year"] == latest_year]
+        top_util = latest.nlargest(15, "total_customers")[["utility_name", "state", "total_customers", "residential_avg_price", "ownership_type"]]
+        st.dataframe(top_util.rename(columns={
+            "utility_name": "Utility", "state": "State",
+            "total_customers": "Customers", "residential_avg_price": "Res. Price (¢/kWh)",
+            "ownership_type": "Ownership",
+        }), use_container_width=True)
+
+
+# ============================================================
+# SECTION 6: CONSUMER IMPACT
+# ============================================================
+
+elif section == "Consumer Impact":
+    st.markdown('<div class="main-header">Consumer Impact</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="sub-header">Rate case effects on customer bills</div>',
+        unsafe_allow_html=True,
+    )
+
+    if imp_df.empty:
+        st.warning("No impact data. Run: `python3 -m src.cli enrich`")
+    else:
+        # KPIs
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.markdown(make_kpi_card(f"{len(imp_df)}", "Cases with Impacts"), unsafe_allow_html=True)
+        with col2:
+            avg_monthly = imp_df["monthly_bill_impact"].mean()
+            st.markdown(make_kpi_card(f"${avg_monthly:,.2f}", "Avg Monthly Impact"), unsafe_allow_html=True)
+        with col3:
+            max_monthly = imp_df["monthly_bill_impact"].max()
+            st.markdown(make_kpi_card(f"${max_monthly:,.2f}", "Max Monthly Impact"), unsafe_allow_html=True)
+
+        st.markdown("---")
+
+        # Monthly bill impact distribution
+        st.subheader("Monthly Bill Impact Distribution")
+        fig = px.histogram(imp_df, x="monthly_bill_impact", nbins=30,
+                           labels={"monthly_bill_impact": "Monthly Bill Impact ($)"},
+                           color_discrete_sequence=["#0984E3"])
+        fig.update_layout(**PLOTLY_LAYOUT)
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Impact by case — merge with rate cases for context
+        st.subheader("Largest Consumer Impacts")
+        impact_display = imp_df.nlargest(15, "monthly_bill_impact")[
+            ["docket_number", "total_customers", "monthly_bill_impact", "annual_bill_impact", "pct_of_avg_bill"]
+        ]
+        st.dataframe(impact_display.rename(columns={
+            "docket_number": "Docket", "total_customers": "Customers",
+            "monthly_bill_impact": "Monthly ($)", "annual_bill_impact": "Annual ($)",
+            "pct_of_avg_bill": "% of Avg Bill",
+        }), use_container_width=True)
+
+        # Percentage of avg bill
+        if "pct_of_avg_bill" in imp_df.columns:
+            pct_data = imp_df.dropna(subset=["pct_of_avg_bill"])
+            if not pct_data.empty:
+                st.subheader("Impact as % of Average Bill")
+                fig = px.histogram(pct_data, x="pct_of_avg_bill", nbins=20,
+                                   labels={"pct_of_avg_bill": "% of Average Monthly Bill"},
+                                   color_discrete_sequence=["#74B9FF"])
+                fig.update_layout(**PLOTLY_LAYOUT)
+                st.plotly_chart(fig, use_container_width=True)
+
+
+# ============================================================
+# SECTION 7: ENVIRONMENTAL IMPACT (eGRID)
+# ============================================================
+
+elif section == "Environmental Impact":
+    st.markdown('<div class="main-header">Environmental Impact</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="sub-header">EPA eGRID utility emissions and generation mix</div>',
+        unsafe_allow_html=True,
+    )
+
+    if emi_df.empty:
+        st.warning("No eGRID data. Run: `python3 -m src.cli enrich`")
+    else:
+        # KPIs
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.markdown(make_kpi_card(f"{len(emi_df):,}", "Utility Records"), unsafe_allow_html=True)
+        with col2:
+            total_co2 = emi_df["co2_tons"].sum()
+            st.markdown(make_kpi_card(f"{total_co2 / 1e6:,.0f}M", "Total CO2 (tons)"), unsafe_allow_html=True)
+        with col3:
+            avg_rate = emi_df["co2_rate_lbs_mwh"].dropna().mean()
+            st.markdown(make_kpi_card(f"{avg_rate:,.0f}", "Avg CO2 Rate (lbs/MWh)"), unsafe_allow_html=True)
+        with col4:
+            total_gen = emi_df["net_generation_mwh"].sum()
+            st.markdown(make_kpi_card(f"{total_gen / 1e9:,.1f}B", "Net Gen (MWh)"), unsafe_allow_html=True)
+
+        st.markdown("---")
+
+        col_left, col_right = st.columns(2)
+
+        with col_left:
+            st.subheader("CO2 Emission Rate Distribution")
+            co2_data = emi_df.dropna(subset=["co2_rate_lbs_mwh"])
+            if not co2_data.empty:
+                fig = px.histogram(co2_data, x="co2_rate_lbs_mwh", nbins=30,
+                                   labels={"co2_rate_lbs_mwh": "CO2 Rate (lbs/MWh)"},
+                                   color_discrete_sequence=["#0984E3"])
+                fig.update_layout(**PLOTLY_LAYOUT)
+                st.plotly_chart(fig, use_container_width=True)
+
+        with col_right:
+            st.subheader("Average Generation Mix")
+            mix_cols = ["coal_pct", "gas_pct", "nuclear_pct", "hydro_pct", "wind_pct", "solar_pct", "other_renewable_pct"]
+            available_mix = [c for c in mix_cols if c in emi_df.columns]
+            if available_mix:
+                avg_mix = emi_df[available_mix].mean()
+                mix_data = pd.DataFrame({"Source": [c.replace("_pct", "").title() for c in available_mix], "Percentage": avg_mix.values})
+                mix_data = mix_data[mix_data["Percentage"] > 0]
+                fig = px.pie(mix_data, values="Percentage", names="Source",
+                             color_discrete_sequence=BLUE_PALETTE + ["#FF6B6B", "#FFE66D"], hole=0.4)
+                fig.update_layout(**PLOTLY_LAYOUT)
+                st.plotly_chart(fig, use_container_width=True)
+
+        # CO2 by state
+        st.subheader("Average CO2 Rate by State")
+        if "state" in emi_df.columns:
+            state_co2 = emi_df.dropna(subset=["co2_rate_lbs_mwh"]).groupby("state")["co2_rate_lbs_mwh"].mean().sort_values(ascending=False).head(20).reset_index()
+            state_co2.columns = ["State", "CO2 Rate (lbs/MWh)"]
+            fig = px.bar(state_co2, x="State", y="CO2 Rate (lbs/MWh)", color="CO2 Rate (lbs/MWh)",
+                         color_continuous_scale=["#0984E3", "#FFE66D", "#FF6B6B"])
+            fig.update_layout(**PLOTLY_LAYOUT)
+            st.plotly_chart(fig, use_container_width=True)
+
+        # Top emitters
+        st.subheader("Highest Emission Utilities")
+        top_emitters = emi_df.nlargest(15, "co2_tons")[
+            ["utility_name_egrid", "state", "co2_tons", "co2_rate_lbs_mwh", "net_generation_mwh"]
+        ]
+        st.dataframe(top_emitters.rename(columns={
+            "utility_name_egrid": "Utility", "state": "State",
+            "co2_tons": "CO2 (tons)", "co2_rate_lbs_mwh": "CO2 Rate",
+            "net_generation_mwh": "Net Gen (MWh)",
+        }), use_container_width=True)
+
+
+# ============================================================
+# SECTION 8: CAPACITY & INFRASTRUCTURE (EIA 860)
+# ============================================================
+
+elif section == "Capacity & Infrastructure":
+    st.markdown('<div class="main-header">Capacity & Infrastructure</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="sub-header">EIA Form 860 generation fleet analysis</div>',
+        unsafe_allow_html=True,
+    )
+
+    if cap_df.empty:
+        st.warning("No EIA 860 data. Run: `python3 -m src.cli enrich`")
+    else:
+        # KPIs
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.markdown(make_kpi_card(f"{len(cap_df):,}", "Utility Records"), unsafe_allow_html=True)
+        with col2:
+            total_cap = cap_df["total_capacity_mw"].sum()
+            st.markdown(make_kpi_card(f"{total_cap / 1e3:,.0f} GW", "Total Capacity"), unsafe_allow_html=True)
+        with col3:
+            avg_age = cap_df["avg_generator_age"].dropna().mean()
+            st.markdown(make_kpi_card(f"{avg_age:.0f} yrs", "Avg Fleet Age"), unsafe_allow_html=True)
+        with col4:
+            total_gens = cap_df["num_generators"].sum()
+            st.markdown(make_kpi_card(f"{total_gens:,}", "Generators"), unsafe_allow_html=True)
+
+        st.markdown("---")
+
+        # Capacity mix
+        st.subheader("National Capacity Mix")
+        fuel_types = ["coal", "gas", "nuclear", "hydro", "wind", "solar", "other"]
+        fuel_sums = {}
+        for fuel in fuel_types:
+            col_name = f"{fuel}_capacity_mw"
+            if col_name in cap_df.columns:
+                fuel_sums[fuel.title()] = cap_df[col_name].sum()
+
+        if fuel_sums:
+            mix_data = pd.DataFrame({"Fuel": fuel_sums.keys(), "Capacity (MW)": fuel_sums.values()})
+            mix_data = mix_data[mix_data["Capacity (MW)"] > 0]
+            fig = px.pie(mix_data, values="Capacity (MW)", names="Fuel",
+                         color_discrete_sequence=BLUE_PALETTE + ["#FF6B6B", "#FFE66D"], hole=0.4)
+            fig.update_layout(**PLOTLY_LAYOUT)
+            st.plotly_chart(fig, use_container_width=True)
+
+        # Fleet age distribution
+        col_left, col_right = st.columns(2)
+        with col_left:
+            st.subheader("Generator Fleet Age Distribution")
+            age_data = cap_df.dropna(subset=["avg_generator_age"])
+            if not age_data.empty:
+                fig = px.histogram(age_data, x="avg_generator_age", nbins=20,
+                                   labels={"avg_generator_age": "Avg Fleet Age (years)"},
+                                   color_discrete_sequence=["#0984E3"])
+                fig.update_layout(**PLOTLY_LAYOUT)
+                st.plotly_chart(fig, use_container_width=True)
+
+        with col_right:
+            st.subheader("Planned Additions vs Retirements")
+            adds = cap_df["planned_additions_mw"].sum()
+            retires = cap_df["planned_retirements_mw"].sum()
+            if adds or retires:
+                plan_data = pd.DataFrame({
+                    "Category": ["Planned Additions", "Planned Retirements"],
+                    "MW": [adds or 0, retires or 0],
+                })
+                fig = px.bar(plan_data, x="Category", y="MW", color="Category",
+                             color_discrete_sequence=["#0984E3", "#FF6B6B"])
+                fig.update_layout(**PLOTLY_LAYOUT, showlegend=False)
+                st.plotly_chart(fig, use_container_width=True)
+
+        # Largest utilities by capacity
+        st.subheader("Largest Utilities by Capacity")
+        top_cap = cap_df.nlargest(15, "total_capacity_mw")[
+            ["eia_utility_id", "total_capacity_mw", "num_plants", "num_generators", "avg_generator_age"]
+        ]
+        st.dataframe(top_cap.rename(columns={
+            "eia_utility_id": "EIA ID", "total_capacity_mw": "Total MW",
+            "num_plants": "Plants", "num_generators": "Generators",
+            "avg_generator_age": "Avg Age",
+        }), use_container_width=True)
+
+
+# ============================================================
+# SECTION 9: GEOGRAPHIC MAP
 # ============================================================
 
 elif section == "Geographic Map":
@@ -809,7 +1162,7 @@ st.markdown(
     <div class="footer">
         Built by Nathan Goldberg |
         <a href="mailto:nathanmauricegoldberg@gmail.com">nathanmauricegoldberg@gmail.com</a> |
-        <a href="https://www.linkedin.com/in/nathanmauricegoldberg/" target="_blank">LinkedIn</a>
+        <a href="https://www.linkedin.com/in/nathan-goldberg-62a44522a/" target="_blank">LinkedIn</a>
     </div>
     """,
     unsafe_allow_html=True,

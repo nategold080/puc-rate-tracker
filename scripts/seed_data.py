@@ -10,7 +10,7 @@ All percentages are stored as floats (e.g., 10.5 for 10.5%).
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 
 def get_pa_puc_seed_data() -> list[dict]:
@@ -18,7 +18,7 @@ def get_pa_puc_seed_data() -> list[dict]:
 
     Based on real PA PUC rate case docket patterns and utility companies.
     """
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.utcnow().isoformat()
     return [
         {
             "docket_number": "R-2024-3046894",
@@ -425,7 +425,7 @@ def get_pa_puc_seed_data() -> list[dict]:
 
 def get_ca_cpuc_seed_data() -> list[dict]:
     """California CPUC rate case seed data."""
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.utcnow().isoformat()
     return [
         {
             "docket_number": "A.23-05-010",
@@ -632,7 +632,7 @@ def get_ca_cpuc_seed_data() -> list[dict]:
 
 def get_or_puc_seed_data() -> list[dict]:
     """Oregon PUC rate case seed data."""
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.utcnow().isoformat()
     return [
         {
             "docket_number": "UE-416",
@@ -739,7 +739,7 @@ def get_or_puc_seed_data() -> list[dict]:
 
 def get_in_iurc_seed_data() -> list[dict]:
     """Indiana IURC rate case seed data."""
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.utcnow().isoformat()
     return [
         {
             "docket_number": "45990",
@@ -846,7 +846,7 @@ def get_in_iurc_seed_data() -> list[dict]:
 
 def get_wa_utc_seed_data() -> list[dict]:
     """Washington UTC rate case seed data."""
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.utcnow().isoformat()
     return [
         {
             "docket_number": "UE-220066",

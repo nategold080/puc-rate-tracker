@@ -16,7 +16,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -158,7 +158,7 @@ def _try_live_scrape(start_year: int, end_year: int) -> list[dict]:
                         "state": STATE,
                         "source": SOURCE_KEY,
                         "source_url": f"{BASE_URL}/pcdocs/search-results/?q={docket}",
-                        "scraped_at": datetime.now(timezone.utc).isoformat(),
+                        "scraped_at": datetime.utcnow().isoformat(),
                     }
                     records.append(record)
 

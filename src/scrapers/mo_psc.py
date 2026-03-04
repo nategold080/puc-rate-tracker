@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 import re
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -306,7 +306,7 @@ def _parse_case_html(html: str, case_number: str, case_id: int) -> dict:
         "decision_date": decision_date,
         "description": description[:500] if description else None,
         "source_url": CASE_URL_TEMPLATE.format(case_id=case_id),
-        "scraped_at": datetime.now(timezone.utc).isoformat(),
+        "scraped_at": datetime.utcnow().isoformat(),
     }
 
 

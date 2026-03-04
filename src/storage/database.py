@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import sqlite3
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
@@ -185,7 +185,7 @@ def upsert_rate_case(case_data: dict[str, Any], conn: Optional[sqlite3.Connectio
     if conn is None:
         conn = get_connection()
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.utcnow().isoformat()
 
     # Fields that map to columns
     columns = [
@@ -295,7 +295,7 @@ def insert_documents(
     if conn is None:
         conn = get_connection()
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.utcnow().isoformat()
     count = 0
 
     for doc in documents:
@@ -354,7 +354,7 @@ def upsert_utility(
     if conn is None:
         conn = get_connection()
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.utcnow().isoformat()
 
     name = utility_data.get("name", "").strip()
     state = utility_data.get("state")
@@ -431,7 +431,7 @@ def start_pipeline_run(
         conn = get_connection()
 
     run_id = str(uuid.uuid4())[:8]
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.utcnow().isoformat()
 
     conn.execute(
         """INSERT INTO pipeline_runs (run_id, source, stage, status, started_at)
@@ -472,7 +472,7 @@ def complete_pipeline_run(
     if conn is None:
         conn = get_connection()
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.utcnow().isoformat()
 
     conn.execute(
         """UPDATE pipeline_runs
@@ -636,7 +636,7 @@ def update_quality_scores(
         conn = get_connection()
 
     count = 0
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.utcnow().isoformat()
 
     for key, score in scores.items():
         if isinstance(key, tuple):
@@ -677,7 +677,7 @@ def update_canonical_names(
         conn = get_connection()
 
     count = 0
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.utcnow().isoformat()
 
     for raw_name, canonical in mappings.items():
         cursor = conn.execute(

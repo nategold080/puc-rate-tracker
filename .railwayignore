@@ -1,0 +1,17 @@
+data/raw/
+data/exports/
+data/cache/
+data/*.db-wal
+data/*.db-shm
+tests/
+__pycache__/
+.pytest_cache/
+*.pyc
+docs/
+outreach/
+scripts/
+*.zip
+*.gz
+
+# Override root .gitignore *.db exclusion
+!data/*.db

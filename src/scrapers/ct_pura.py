@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 import re
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -263,7 +263,7 @@ def _fetch_rate_cases(start_year: int, end_year: int) -> list[dict]:
             "filing_date": _docket_to_filing_date(base),
             "description": (title or context)[:500] if (title or context) else None,
             "source_url": f"{BASE_URL}/dockcurr.nsf/{VIEW_ID}?SearchView&Query=%5B{base}%5D",
-            "scraped_at": datetime.now(timezone.utc).isoformat(),
+            "scraped_at": datetime.utcnow().isoformat(),
         })
 
     return records

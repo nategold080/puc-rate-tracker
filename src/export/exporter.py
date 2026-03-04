@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import csv
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -54,7 +54,7 @@ def export_data(
         return []
 
     exported_files = []
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d")
+    timestamp = datetime.utcnow().strftime("%Y%m%d")
 
     if fmt in ("csv", "all"):
         path = _export_csv(cases, out_dir, timestamp)
@@ -127,7 +127,7 @@ def _export_json(
 
     export_data = {
         "metadata": {
-            "exported_at": datetime.now(timezone.utc).isoformat(),
+            "exported_at": datetime.utcnow().isoformat(),
             "total_records": len(cases),
             "total_utilities": len(utilities),
             "format_version": "1.0",
@@ -264,7 +264,7 @@ def _export_excel(
         bold=True, size=14
     )
     row += 1
-    ws3.cell(row=row, column=1, value=f"Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
+    ws3.cell(row=row, column=1, value=f"Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}")
     row += 1
     ws3.cell(row=row, column=1, value=f"Built by Nathan Goldberg | nathanmauricegoldberg@gmail.com")
     row += 2
@@ -316,7 +316,7 @@ def _export_markdown(
     lines = []
     lines.append("# PUC Rate Case Tracker - Data Summary")
     lines.append("")
-    lines.append(f"*Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}*")
+    lines.append(f"*Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}*")
     lines.append(f"*Built by Nathan Goldberg | nathanmauricegoldberg@gmail.com*")
     lines.append("")
 
