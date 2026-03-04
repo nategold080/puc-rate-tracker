@@ -7,8 +7,9 @@ summary formats. Enriches rate case exports with utility details.
 from __future__ import annotations
 
 import csv
+import html
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -33,7 +34,11 @@ def export_data(
     Returns:
         List of paths to exported files.
     """
-    from src.storage.database import get_all_rate_cases, get_all_utilities, get_connection, get_stats
+    from src.storage.database import (
+        get_all_rate_cases, get_all_utilities, get_connection, get_stats,
+        get_enrichment_stats, get_utility_operations, get_utility_emissions,
+        get_utility_capacity, get_rate_case_impacts,
+    )
 
     # Resolve output directory
     if Path(output_dir).is_absolute():
@@ -47,14 +52,33 @@ def export_data(
     cases = get_all_rate_cases(limit=10000, conn=conn)
     utilities = get_all_utilities(conn=conn)
     stats = get_stats(conn=conn, print_output=False)
+
+    # Load enrichment data
+    try:
+        enrichment_stats = get_enrichment_stats(conn=conn)
+        operations = get_utility_operations(conn=conn)
+        emissions = get_utility_emissions(conn=conn)
+        capacity = get_utility_capacity(conn=conn)
+        impacts = get_rate_case_impacts(conn=conn)
+    except Exception:
+        enrichment_stats = {}
+        operations = []
+        emissions = []
+        capacity = []
+        impacts = []
+
     conn.close()
+
+    # Sanitize text fields (decode any remaining HTML entities)
+    cases = [_sanitize_record(c) for c in cases]
+    utilities = [_sanitize_record(u) for u in utilities]
 
     if not cases:
         console.print("[yellow]No rate cases to export.[/yellow]")
         return []
 
     exported_files = []
-    timestamp = datetime.utcnow().strftime("%Y%m%d")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d")
 
     if fmt in ("csv", "all"):
         path = _export_csv(cases, out_dir, timestamp)
@@ -70,14 +94,40 @@ def export_data(
             exported_files.append(path)
 
     if fmt in ("markdown", "all"):
-        path = _export_markdown(cases, stats, out_dir, timestamp)
+        path = _export_markdown(cases, stats, out_dir, timestamp, enrichment_stats)
         exported_files.append(path)
+
+    # Enrichment data exports (always CSV)
+    if fmt in ("csv", "all"):
+        if operations:
+            path = _export_enrichment_csv(operations, "utility_operations", out_dir, timestamp)
+            exported_files.append(path)
+        if emissions:
+            path = _export_enrichment_csv(emissions, "utility_emissions", out_dir, timestamp)
+            exported_files.append(path)
+        if capacity:
+            path = _export_enrichment_csv(capacity, "utility_capacity", out_dir, timestamp)
+            exported_files.append(path)
+        if impacts:
+            path = _export_enrichment_csv(impacts, "rate_case_impacts", out_dir, timestamp)
+            exported_files.append(path)
 
     console.print(f"\n[bold green]Exported {len(exported_files)} files to {out_dir}[/bold green]")
     for f in exported_files:
         console.print(f"  [dim]{f.name}[/dim]")
 
     return exported_files
+
+
+def _sanitize_record(record: dict) -> dict:
+    """Decode HTML entities in all string fields of a record."""
+    sanitized = {}
+    for key, value in record.items():
+        if isinstance(value, str) and ("&" in value):
+            sanitized[key] = html.unescape(value)
+        else:
+            sanitized[key] = value
+    return sanitized
 
 
 # --- CSV Export ---
@@ -127,13 +177,20 @@ def _export_json(
 
     export_data = {
         "metadata": {
-            "exported_at": datetime.utcnow().isoformat(),
+            "exported_at": datetime.now(timezone.utc).isoformat(),
             "total_records": len(cases),
             "total_utilities": len(utilities),
-            "format_version": "1.0",
+            "format_version": "1.1",
             "project": "PUC Rate Case Tracker",
             "author": "Nathan Goldberg",
             "contact": "nathanmauricegoldberg@gmail.com",
+            "data_units": {
+                "requested_revenue_change": "millions of USD",
+                "approved_revenue_change": "millions of USD",
+                "rate_base": "millions of USD",
+                "return_on_equity": "percentage (e.g., 10.39 = 10.39%)",
+                "quality_score": "0.0 to 1.0 (higher is better)",
+            },
         },
         "statistics": stats,
         "rate_cases": cases,
@@ -264,7 +321,7 @@ def _export_excel(
         bold=True, size=14
     )
     row += 1
-    ws3.cell(row=row, column=1, value=f"Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}")
+    ws3.cell(row=row, column=1, value=f"Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
     row += 1
     ws3.cell(row=row, column=1, value=f"Built by Nathan Goldberg | nathanmauricegoldberg@gmail.com")
     row += 2
@@ -306,8 +363,32 @@ def _export_excel(
 # --- Markdown Export ---
 
 
+def _export_enrichment_csv(
+    records: list[dict], name: str, out_dir: Path, timestamp: str
+) -> Path:
+    """Export enrichment data to CSV."""
+    filename = f"{name}_{timestamp}.csv"
+    filepath = out_dir / filename
+
+    if not records:
+        return filepath
+
+    # Use keys from first record
+    columns = [k for k in records[0].keys() if k != "created_at"]
+
+    with open(filepath, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=columns, extrasaction="ignore")
+        writer.writeheader()
+        for rec in records:
+            writer.writerow(rec)
+
+    console.print(f"[green]CSV exported: {filename} ({len(records)} records)[/green]")
+    return filepath
+
+
 def _export_markdown(
-    cases: list[dict], stats: dict, out_dir: Path, timestamp: str
+    cases: list[dict], stats: dict, out_dir: Path, timestamp: str,
+    enrichment_stats: Optional[dict] = None,
 ) -> Path:
     """Export summary statistics in Markdown format."""
     filename = f"puc_rate_cases_summary_{timestamp}.md"
@@ -316,7 +397,7 @@ def _export_markdown(
     lines = []
     lines.append("# PUC Rate Case Tracker - Data Summary")
     lines.append("")
-    lines.append(f"*Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}*")
+    lines.append(f"*Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}*")
     lines.append(f"*Built by Nathan Goldberg | nathanmauricegoldberg@gmail.com*")
     lines.append("")
 
@@ -397,12 +478,28 @@ def _export_markdown(
         req_str = f"${requested:,.1f}" if requested is not None else "N/A"
         app_str = f"${approved:,.1f}" if approved is not None else "Pending"
 
-        lines.append(f"| {docket} | {utility[:30]} | {state} | {req_str} | {app_str} | {status} |")
+        lines.append(f"| {docket} | {utility[:45]} | {state} | {req_str} | {app_str} | {status} |")
 
-    lines.append("")
+    # Enrichment stats
+    if enrichment_stats:
+        lines.append("")
+        lines.append("## Enrichment Data")
+        lines.append("")
+        if enrichment_stats.get("utility_operations"):
+            lines.append(f"- **EIA 861 Utility Operations:** {enrichment_stats['utility_operations']} records")
+        if enrichment_stats.get("linked_utilities"):
+            lines.append(f"- **Utilities Linked to EIA:** {enrichment_stats['linked_utilities']}")
+        if enrichment_stats.get("emissions_records"):
+            lines.append(f"- **eGRID Emissions Records:** {enrichment_stats['emissions_records']}")
+        if enrichment_stats.get("capacity_records"):
+            lines.append(f"- **EIA 860 Capacity Records:** {enrichment_stats['capacity_records']}")
+        if enrichment_stats.get("impact_records"):
+            lines.append(f"- **Rate Case Impact Estimates:** {enrichment_stats['impact_records']}")
+        lines.append("")
+
     lines.append("---")
     lines.append("")
-    lines.append("*Data sourced from state PUC docket systems (PA, CA, OR, IN, WA).*")
+    lines.append("*Data sourced from state PUC docket systems (MO, OR, CT, GA), EIA Forms 861/860, and EPA eGRID.*")
     lines.append("*Contact: nathanmauricegoldberg@gmail.com*")
 
     filepath.write_text("\n".join(lines), encoding="utf-8")

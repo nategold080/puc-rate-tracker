@@ -1,6 +1,6 @@
 """CLI interface for State PUC Rate Case Tracker.
 
-Commands: scrape, extract, normalize, validate, export, dashboard, stats, pipeline, seed
+Commands: scrape, extract, normalize, validate, export, dashboard, stats, pipeline
 """
 
 import click
@@ -19,7 +19,7 @@ def cli():
     Cross-linked database of utility rate case filings and decisions across
     state public utility commissions. Tracks docket numbers, filing/decision
     dates, revenue requests vs. approvals, case types, and utility entities
-    across PA, OR, CA, IN, and WA.
+    across MO, OR, CT, and GA.
     """
     pass
 
@@ -104,6 +104,152 @@ def export(fmt, output_dir):
 
 
 @cli.command()
+@click.option("--years", "-y", default="2020,2021,2022", help="Comma-separated years to fetch")
+@click.option("--force", "-f", is_flag=True, help="Re-download even if cached")
+def enrich(years, force):
+    """Run all data enrichment: EIA 861 + eGRID + EIA 860 + impact calculations."""
+    from src.storage.database import (
+        get_all_rate_cases, get_all_utilities, get_connection, get_utility_eia_links,
+        get_utility_operations, init_db,
+        upsert_utility_operations_batch, upsert_utility_eia_links_batch,
+        upsert_utility_emissions_batch, upsert_utility_capacity_batch,
+        upsert_rate_case_impacts_batch,
+    )
+    from src.scrapers.eia_861 import fetch_eia_861
+    from src.scrapers.egrid import fetch_egrid
+    from src.scrapers.eia_860 import fetch_eia_860
+    from src.normalization.cross_linker import (
+        cross_link_utilities, cross_link_emissions, compute_rate_case_impacts,
+    )
+
+    year_list = [int(y.strip()) for y in years.split(",")]
+
+    conn = init_db()
+
+    # Phase 1: EIA Form 861
+    console.print("\n[bold blue]Phase 1: EIA Form 861 — Utility Operations[/bold blue]")
+    eia_records = fetch_eia_861(years=year_list, force=force)
+    if eia_records:
+        created, updated = upsert_utility_operations_batch(eia_records, conn=conn)
+        console.print(f"[green]Stored {created} new, {updated} updated EIA 861 records[/green]")
+
+    # Cross-link PUC utilities to EIA IDs
+    console.print("\n[bold]Cross-linking utilities to EIA IDs...[/bold]")
+    puc_utilities = get_all_utilities(conn=conn)
+    links = cross_link_utilities(puc_utilities, eia_records)
+    if links:
+        upsert_utility_eia_links_batch(links, conn=conn)
+
+    # Phase 2: eGRID emissions
+    console.print("\n[bold blue]Phase 2: EPA eGRID — Emissions[/bold blue]")
+    egrid_years = [y for y in year_list if y >= 2020]
+    if not egrid_years:
+        egrid_years = [2022]
+    emissions = fetch_egrid(years=egrid_years, force=force)
+    if emissions:
+        # Link emissions to EIA IDs
+        eia_links = get_utility_eia_links(conn=conn)
+        cross_link_emissions(eia_links, emissions)
+        created, updated = upsert_utility_emissions_batch(emissions, conn=conn)
+        console.print(f"[green]Stored {created} new, {updated} updated emissions records[/green]")
+
+    # Phase 3: EIA Form 860
+    console.print("\n[bold blue]Phase 3: EIA Form 860 — Generation Capacity[/bold blue]")
+    capacity_records = fetch_eia_860(years=egrid_years, force=force)
+    if capacity_records:
+        created, updated = upsert_utility_capacity_batch(capacity_records, conn=conn)
+        console.print(f"[green]Stored {created} new, {updated} updated capacity records[/green]")
+
+    # Phase 4: Rate case impact calculations
+    console.print("\n[bold blue]Phase 4: Rate Case Consumer Impact Calculations[/bold blue]")
+    rate_cases = get_all_rate_cases(limit=10000, conn=conn)
+    eia_links = get_utility_eia_links(conn=conn)
+    operations = get_utility_operations(conn=conn)
+    impacts = compute_rate_case_impacts(rate_cases, eia_links, operations)
+    if impacts:
+        count = upsert_rate_case_impacts_batch(impacts, conn=conn)
+        console.print(f"[green]Stored {count} rate case impact records[/green]")
+
+    conn.close()
+    console.print("\n[bold green]Enrichment complete![/bold green]")
+
+
+@cli.command(name="enrich-eia861")
+@click.option("--years", "-y", default="2020,2021,2022", help="Comma-separated years")
+@click.option("--force", "-f", is_flag=True, help="Re-download even if cached")
+def enrich_eia861(years, force):
+    """Download and store EIA Form 861 utility operational data."""
+    from src.storage.database import (
+        get_all_utilities, get_connection, init_db,
+        upsert_utility_operations_batch, upsert_utility_eia_links_batch,
+    )
+    from src.scrapers.eia_861 import fetch_eia_861
+    from src.normalization.cross_linker import cross_link_utilities
+
+    year_list = [int(y.strip()) for y in years.split(",")]
+    conn = init_db()
+
+    records = fetch_eia_861(years=year_list, force=force)
+    if records:
+        created, updated = upsert_utility_operations_batch(records, conn=conn)
+        console.print(f"[green]Stored {created} new, {updated} updated[/green]")
+
+        # Cross-link
+        puc_utilities = get_all_utilities(conn=conn)
+        links = cross_link_utilities(puc_utilities, records)
+        if links:
+            upsert_utility_eia_links_batch(links, conn=conn)
+
+    conn.close()
+
+
+@cli.command(name="enrich-egrid")
+@click.option("--years", "-y", default="2022", help="Comma-separated years")
+@click.option("--force", "-f", is_flag=True, help="Re-download even if cached")
+def enrich_egrid(years, force):
+    """Download and store EPA eGRID emissions data."""
+    from src.storage.database import (
+        get_connection, get_utility_eia_links, init_db,
+        upsert_utility_emissions_batch,
+    )
+    from src.scrapers.egrid import fetch_egrid
+    from src.normalization.cross_linker import cross_link_emissions
+
+    year_list = [int(y.strip()) for y in years.split(",")]
+    conn = init_db()
+
+    emissions = fetch_egrid(years=year_list, force=force)
+    if emissions:
+        eia_links = get_utility_eia_links(conn=conn)
+        cross_link_emissions(eia_links, emissions)
+        created, updated = upsert_utility_emissions_batch(emissions, conn=conn)
+        console.print(f"[green]Stored {created} new, {updated} updated[/green]")
+
+    conn.close()
+
+
+@cli.command(name="enrich-eia860")
+@click.option("--years", "-y", default="2022", help="Comma-separated years")
+@click.option("--force", "-f", is_flag=True, help="Re-download even if cached")
+def enrich_eia860(years, force):
+    """Download and store EIA Form 860 generation capacity data."""
+    from src.storage.database import (
+        get_connection, init_db, upsert_utility_capacity_batch,
+    )
+    from src.scrapers.eia_860 import fetch_eia_860
+
+    year_list = [int(y.strip()) for y in years.split(",")]
+    conn = init_db()
+
+    records = fetch_eia_860(years=year_list, force=force)
+    if records:
+        created, updated = upsert_utility_capacity_batch(records, conn=conn)
+        console.print(f"[green]Stored {created} new, {updated} updated[/green]")
+
+    conn.close()
+
+
+@cli.command()
 @click.option("--port", "-p", type=int, default=8501, help="Dashboard port")
 def dashboard(port):
     """Launch the Streamlit dashboard."""
@@ -119,46 +265,6 @@ def stats():
     """Show database statistics."""
     from src.storage.database import get_stats
     get_stats()
-
-
-@cli.command()
-def seed():
-    """Load seed data into the database.
-
-    Initializes the database and loads realistic sample rate case records
-    from 5 state PUCs (PA, CA, OR, IN, WA). Use this to populate the
-    database without requiring live web scraping.
-    """
-    from src.storage.database import init_db, store_records
-    from scripts.seed_data import get_all_seed_data
-
-    console.print("[bold blue]Loading seed data...[/bold blue]")
-
-    conn = init_db()
-
-    all_data = get_all_seed_data()
-    total_created = 0
-    total_updated = 0
-
-    for source_key, records in all_data.items():
-        created, updated = store_records(source_key, records, conn=conn)
-        total_created += created
-        total_updated += updated
-
-    conn.close()
-
-    console.print(f"\n[bold green]Seed data loaded: {total_created} created, {total_updated} updated[/bold green]")
-
-    # Run normalization and validation
-    console.print("\n[bold]Running normalization...[/bold]")
-    from src.normalization.utilities import normalize_utilities
-    normalize_utilities()
-
-    console.print("\n[bold]Running quality validation...[/bold]")
-    from src.validation.quality import validate_all
-    validate_all()
-
-    console.print("\n[bold green]Database ready![/bold green]")
 
 
 @cli.command()

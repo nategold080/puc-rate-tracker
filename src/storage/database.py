@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import sqlite3
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -95,6 +95,121 @@ CREATE TABLE IF NOT EXISTS pipeline_runs (
     completed_at TEXT,
     notes TEXT
 );
+
+-- EIA Form 861 utility operational data
+CREATE TABLE IF NOT EXISTS utility_operations (
+    eia_utility_id INTEGER NOT NULL,
+    year INTEGER NOT NULL,
+    utility_name TEXT,
+    state TEXT,
+    ownership_type TEXT,
+    residential_customers INTEGER,
+    commercial_customers INTEGER,
+    industrial_customers INTEGER,
+    total_customers INTEGER,
+    residential_revenue REAL,
+    commercial_revenue REAL,
+    industrial_revenue REAL,
+    total_revenue REAL,
+    residential_sales_mwh REAL,
+    commercial_sales_mwh REAL,
+    industrial_sales_mwh REAL,
+    total_sales_mwh REAL,
+    residential_avg_price REAL,
+    commercial_avg_price REAL,
+    industrial_avg_price REAL,
+    avg_price REAL,
+    revenue_per_customer REAL,
+    quality_score REAL,
+    created_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (eia_utility_id, year)
+);
+
+-- Link PUC utilities to EIA utility IDs
+CREATE TABLE IF NOT EXISTS utility_eia_links (
+    utility_name TEXT NOT NULL,
+    state TEXT NOT NULL,
+    eia_utility_id INTEGER NOT NULL,
+    match_confidence REAL,
+    match_method TEXT,
+    PRIMARY KEY (utility_name, state, eia_utility_id)
+);
+
+-- EPA eGRID utility emissions data
+CREATE TABLE IF NOT EXISTS utility_emissions (
+    utility_name_egrid TEXT NOT NULL,
+    state TEXT NOT NULL,
+    year INTEGER NOT NULL,
+    eia_utility_id INTEGER,
+    net_generation_mwh REAL,
+    co2_tons REAL,
+    nox_tons REAL,
+    so2_tons REAL,
+    co2_rate_lbs_mwh REAL,
+    nox_rate_lbs_mwh REAL,
+    so2_rate_lbs_mwh REAL,
+    coal_pct REAL,
+    gas_pct REAL,
+    nuclear_pct REAL,
+    hydro_pct REAL,
+    wind_pct REAL,
+    solar_pct REAL,
+    other_renewable_pct REAL,
+    quality_score REAL,
+    created_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (utility_name_egrid, state, year)
+);
+
+-- EIA Form 860 utility generation capacity
+CREATE TABLE IF NOT EXISTS utility_capacity (
+    eia_utility_id INTEGER NOT NULL,
+    year INTEGER NOT NULL,
+    coal_capacity_mw REAL,
+    gas_capacity_mw REAL,
+    nuclear_capacity_mw REAL,
+    hydro_capacity_mw REAL,
+    wind_capacity_mw REAL,
+    solar_capacity_mw REAL,
+    other_capacity_mw REAL,
+    total_capacity_mw REAL,
+    num_plants INTEGER,
+    num_generators INTEGER,
+    avg_generator_age REAL,
+    planned_additions_mw REAL,
+    planned_retirements_mw REAL,
+    quality_score REAL,
+    created_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (eia_utility_id, year)
+);
+
+-- Rate case consumer impact estimates
+CREATE TABLE IF NOT EXISTS rate_case_impacts (
+    docket_number TEXT NOT NULL,
+    source TEXT NOT NULL,
+    eia_utility_id INTEGER,
+    total_customers INTEGER,
+    monthly_bill_impact REAL,
+    annual_bill_impact REAL,
+    pct_of_avg_bill REAL,
+    residential_price_before REAL,
+    residential_price_after REAL,
+    created_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (docket_number, source)
+);
+
+-- Indexes for enrichment tables
+CREATE INDEX IF NOT EXISTS idx_operations_utility ON utility_operations(eia_utility_id);
+CREATE INDEX IF NOT EXISTS idx_operations_year ON utility_operations(year);
+CREATE INDEX IF NOT EXISTS idx_operations_state ON utility_operations(state);
+CREATE INDEX IF NOT EXISTS idx_operations_ownership ON utility_operations(ownership_type);
+CREATE INDEX IF NOT EXISTS idx_eia_links_utility ON utility_eia_links(utility_name, state);
+CREATE INDEX IF NOT EXISTS idx_eia_links_eia ON utility_eia_links(eia_utility_id);
+CREATE INDEX IF NOT EXISTS idx_emissions_state ON utility_emissions(state);
+CREATE INDEX IF NOT EXISTS idx_emissions_co2 ON utility_emissions(co2_rate_lbs_mwh);
+CREATE INDEX IF NOT EXISTS idx_emissions_eia ON utility_emissions(eia_utility_id);
+CREATE INDEX IF NOT EXISTS idx_capacity_utility ON utility_capacity(eia_utility_id);
+CREATE INDEX IF NOT EXISTS idx_capacity_year ON utility_capacity(year);
+CREATE INDEX IF NOT EXISTS idx_impacts_docket ON rate_case_impacts(docket_number);
 
 -- Indexes for common query patterns
 CREATE INDEX IF NOT EXISTS idx_rate_cases_docket ON rate_cases(docket_number);
@@ -185,7 +300,7 @@ def upsert_rate_case(case_data: dict[str, Any], conn: Optional[sqlite3.Connectio
     if conn is None:
         conn = get_connection()
 
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
 
     # Fields that map to columns
     columns = [
@@ -295,7 +410,7 @@ def insert_documents(
     if conn is None:
         conn = get_connection()
 
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     count = 0
 
     for doc in documents:
@@ -354,7 +469,7 @@ def upsert_utility(
     if conn is None:
         conn = get_connection()
 
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
 
     name = utility_data.get("name", "").strip()
     state = utility_data.get("state")
@@ -431,7 +546,7 @@ def start_pipeline_run(
         conn = get_connection()
 
     run_id = str(uuid.uuid4())[:8]
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
 
     conn.execute(
         """INSERT INTO pipeline_runs (run_id, source, stage, status, started_at)
@@ -472,7 +587,7 @@ def complete_pipeline_run(
     if conn is None:
         conn = get_connection()
 
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
 
     conn.execute(
         """UPDATE pipeline_runs
@@ -636,7 +751,7 @@ def update_quality_scores(
         conn = get_connection()
 
     count = 0
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
 
     for key, score in scores.items():
         if isinstance(key, tuple):
@@ -677,7 +792,7 @@ def update_canonical_names(
         conn = get_connection()
 
     count = 0
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
 
     for raw_name, canonical in mappings.items():
         cursor = conn.execute(
@@ -907,3 +1022,443 @@ def store_records(
         conn.close()
 
     return created, updated
+
+
+# --- EIA Operations CRUD ---
+
+
+def upsert_utility_operations_batch(
+    records: list[dict[str, Any]], conn: Optional[sqlite3.Connection] = None
+) -> tuple[int, int]:
+    """Batch upsert EIA utility operations records.
+
+    Args:
+        records: List of utility operations dicts.
+        conn: Optional database connection.
+
+    Returns:
+        Tuple of (created, updated) counts.
+    """
+    should_close = conn is None
+    if conn is None:
+        conn = get_connection()
+
+    created, updated = 0, 0
+
+    for rec in records:
+        existing = conn.execute(
+            "SELECT 1 FROM utility_operations WHERE eia_utility_id = ? AND year = ?",
+            (rec["eia_utility_id"], rec["year"]),
+        ).fetchone()
+
+        cols = [
+            "eia_utility_id", "year", "utility_name", "state", "ownership_type",
+            "residential_customers", "commercial_customers", "industrial_customers",
+            "total_customers", "residential_revenue", "commercial_revenue",
+            "industrial_revenue", "total_revenue", "residential_sales_mwh",
+            "commercial_sales_mwh", "industrial_sales_mwh", "total_sales_mwh",
+            "residential_avg_price", "commercial_avg_price", "industrial_avg_price",
+            "avg_price", "revenue_per_customer", "quality_score",
+        ]
+
+        data = {c: rec.get(c) for c in cols if rec.get(c) is not None}
+        col_names = list(data.keys())
+        placeholders = ", ".join(["?"] * len(col_names))
+        update_clause = ", ".join(
+            f"{c} = excluded.{c}" for c in col_names
+            if c not in ("eia_utility_id", "year")
+        )
+
+        sql = f"""
+            INSERT INTO utility_operations ({', '.join(col_names)})
+            VALUES ({placeholders})
+            ON CONFLICT(eia_utility_id, year) DO UPDATE SET {update_clause}
+        """
+        conn.execute(sql, [data[c] for c in col_names])
+
+        if existing:
+            updated += 1
+        else:
+            created += 1
+
+    conn.commit()
+    if should_close:
+        conn.close()
+
+    return created, updated
+
+
+def upsert_utility_eia_links_batch(
+    links: list[dict[str, Any]], conn: Optional[sqlite3.Connection] = None
+) -> int:
+    """Batch upsert utility-EIA linkage records.
+
+    Args:
+        links: List of link dicts with utility_name, state, eia_utility_id.
+        conn: Optional database connection.
+
+    Returns:
+        Number of links stored.
+    """
+    should_close = conn is None
+    if conn is None:
+        conn = get_connection()
+
+    count = 0
+    for link in links:
+        conn.execute(
+            """INSERT INTO utility_eia_links
+               (utility_name, state, eia_utility_id, match_confidence, match_method)
+               VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT(utility_name, state, eia_utility_id) DO UPDATE SET
+               match_confidence = excluded.match_confidence,
+               match_method = excluded.match_method""",
+            (
+                link["utility_name"],
+                link["state"],
+                link["eia_utility_id"],
+                link.get("match_confidence"),
+                link.get("match_method"),
+            ),
+        )
+        count += 1
+
+    conn.commit()
+    if should_close:
+        conn.close()
+
+    return count
+
+
+def upsert_utility_emissions_batch(
+    records: list[dict[str, Any]], conn: Optional[sqlite3.Connection] = None
+) -> tuple[int, int]:
+    """Batch upsert eGRID emissions records.
+
+    Args:
+        records: List of emissions dicts.
+        conn: Optional database connection.
+
+    Returns:
+        Tuple of (created, updated) counts.
+    """
+    should_close = conn is None
+    if conn is None:
+        conn = get_connection()
+
+    created, updated = 0, 0
+
+    for rec in records:
+        existing = conn.execute(
+            "SELECT 1 FROM utility_emissions WHERE utility_name_egrid = ? AND state = ? AND year = ?",
+            (rec["utility_name_egrid"], rec["state"], rec["year"]),
+        ).fetchone()
+
+        cols = [
+            "utility_name_egrid", "state", "year", "eia_utility_id",
+            "net_generation_mwh", "co2_tons", "nox_tons", "so2_tons",
+            "co2_rate_lbs_mwh", "nox_rate_lbs_mwh", "so2_rate_lbs_mwh",
+            "coal_pct", "gas_pct", "nuclear_pct", "hydro_pct",
+            "wind_pct", "solar_pct", "other_renewable_pct", "quality_score",
+        ]
+
+        data = {c: rec.get(c) for c in cols if rec.get(c) is not None}
+        col_names = list(data.keys())
+        placeholders = ", ".join(["?"] * len(col_names))
+        update_clause = ", ".join(
+            f"{c} = excluded.{c}" for c in col_names
+            if c not in ("utility_name_egrid", "state", "year")
+        )
+
+        sql = f"""
+            INSERT INTO utility_emissions ({', '.join(col_names)})
+            VALUES ({placeholders})
+            ON CONFLICT(utility_name_egrid, state, year) DO UPDATE SET {update_clause}
+        """
+        conn.execute(sql, [data[c] for c in col_names])
+
+        if existing:
+            updated += 1
+        else:
+            created += 1
+
+    conn.commit()
+    if should_close:
+        conn.close()
+
+    return created, updated
+
+
+def upsert_utility_capacity_batch(
+    records: list[dict[str, Any]], conn: Optional[sqlite3.Connection] = None
+) -> tuple[int, int]:
+    """Batch upsert EIA 860 capacity records.
+
+    Args:
+        records: List of capacity dicts.
+        conn: Optional database connection.
+
+    Returns:
+        Tuple of (created, updated) counts.
+    """
+    should_close = conn is None
+    if conn is None:
+        conn = get_connection()
+
+    created, updated = 0, 0
+
+    for rec in records:
+        existing = conn.execute(
+            "SELECT 1 FROM utility_capacity WHERE eia_utility_id = ? AND year = ?",
+            (rec["eia_utility_id"], rec["year"]),
+        ).fetchone()
+
+        cols = [
+            "eia_utility_id", "year", "coal_capacity_mw", "gas_capacity_mw",
+            "nuclear_capacity_mw", "hydro_capacity_mw", "wind_capacity_mw",
+            "solar_capacity_mw", "other_capacity_mw", "total_capacity_mw",
+            "num_plants", "num_generators", "avg_generator_age",
+            "planned_additions_mw", "planned_retirements_mw", "quality_score",
+        ]
+
+        data = {c: rec.get(c) for c in cols if rec.get(c) is not None}
+        col_names = list(data.keys())
+        placeholders = ", ".join(["?"] * len(col_names))
+        update_clause = ", ".join(
+            f"{c} = excluded.{c}" for c in col_names
+            if c not in ("eia_utility_id", "year")
+        )
+
+        sql = f"""
+            INSERT INTO utility_capacity ({', '.join(col_names)})
+            VALUES ({placeholders})
+            ON CONFLICT(eia_utility_id, year) DO UPDATE SET {update_clause}
+        """
+        conn.execute(sql, [data[c] for c in col_names])
+
+        if existing:
+            updated += 1
+        else:
+            created += 1
+
+    conn.commit()
+    if should_close:
+        conn.close()
+
+    return created, updated
+
+
+def upsert_rate_case_impacts_batch(
+    impacts: list[dict[str, Any]], conn: Optional[sqlite3.Connection] = None
+) -> int:
+    """Batch upsert rate case consumer impact records.
+
+    Args:
+        impacts: List of impact dicts.
+        conn: Optional database connection.
+
+    Returns:
+        Number of impacts stored.
+    """
+    should_close = conn is None
+    if conn is None:
+        conn = get_connection()
+
+    count = 0
+    for imp in impacts:
+        conn.execute(
+            """INSERT INTO rate_case_impacts
+               (docket_number, source, eia_utility_id, total_customers,
+                monthly_bill_impact, annual_bill_impact, pct_of_avg_bill,
+                residential_price_before, residential_price_after)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(docket_number, source) DO UPDATE SET
+               eia_utility_id = excluded.eia_utility_id,
+               total_customers = excluded.total_customers,
+               monthly_bill_impact = excluded.monthly_bill_impact,
+               annual_bill_impact = excluded.annual_bill_impact,
+               pct_of_avg_bill = excluded.pct_of_avg_bill,
+               residential_price_before = excluded.residential_price_before,
+               residential_price_after = excluded.residential_price_after""",
+            (
+                imp["docket_number"],
+                imp["source"],
+                imp.get("eia_utility_id"),
+                imp.get("total_customers"),
+                imp.get("monthly_bill_impact"),
+                imp.get("annual_bill_impact"),
+                imp.get("pct_of_avg_bill"),
+                imp.get("residential_price_before"),
+                imp.get("residential_price_after"),
+            ),
+        )
+        count += 1
+
+    conn.commit()
+    if should_close:
+        conn.close()
+
+    return count
+
+
+# --- Enrichment Query Functions ---
+
+
+def get_utility_operations(
+    eia_utility_id: Optional[int] = None,
+    state: Optional[str] = None,
+    year: Optional[int] = None,
+    conn: Optional[sqlite3.Connection] = None,
+) -> list[dict]:
+    """Query utility operations data."""
+    should_close = conn is None
+    if conn is None:
+        conn = get_connection()
+
+    conditions, params = [], []
+    if eia_utility_id:
+        conditions.append("eia_utility_id = ?")
+        params.append(eia_utility_id)
+    if state:
+        conditions.append("state = ?")
+        params.append(state.upper())
+    if year:
+        conditions.append("year = ?")
+        params.append(year)
+
+    where = " WHERE " + " AND ".join(conditions) if conditions else ""
+    rows = conn.execute(
+        f"SELECT * FROM utility_operations{where} ORDER BY year DESC", params
+    ).fetchall()
+    result = [dict(r) for r in rows]
+
+    if should_close:
+        conn.close()
+    return result
+
+
+def get_utility_eia_links(conn: Optional[sqlite3.Connection] = None) -> list[dict]:
+    """Get all utility-EIA linkage records."""
+    should_close = conn is None
+    if conn is None:
+        conn = get_connection()
+
+    rows = conn.execute("SELECT * FROM utility_eia_links").fetchall()
+    result = [dict(r) for r in rows]
+
+    if should_close:
+        conn.close()
+    return result
+
+
+def get_utility_emissions(
+    state: Optional[str] = None,
+    year: Optional[int] = None,
+    conn: Optional[sqlite3.Connection] = None,
+) -> list[dict]:
+    """Query utility emissions data."""
+    should_close = conn is None
+    if conn is None:
+        conn = get_connection()
+
+    conditions, params = [], []
+    if state:
+        conditions.append("state = ?")
+        params.append(state.upper())
+    if year:
+        conditions.append("year = ?")
+        params.append(year)
+
+    where = " WHERE " + " AND ".join(conditions) if conditions else ""
+    rows = conn.execute(
+        f"SELECT * FROM utility_emissions{where} ORDER BY co2_tons DESC", params
+    ).fetchall()
+    result = [dict(r) for r in rows]
+
+    if should_close:
+        conn.close()
+    return result
+
+
+def get_utility_capacity(
+    eia_utility_id: Optional[int] = None,
+    year: Optional[int] = None,
+    conn: Optional[sqlite3.Connection] = None,
+) -> list[dict]:
+    """Query utility capacity data."""
+    should_close = conn is None
+    if conn is None:
+        conn = get_connection()
+
+    conditions, params = [], []
+    if eia_utility_id:
+        conditions.append("eia_utility_id = ?")
+        params.append(eia_utility_id)
+    if year:
+        conditions.append("year = ?")
+        params.append(year)
+
+    where = " WHERE " + " AND ".join(conditions) if conditions else ""
+    rows = conn.execute(
+        f"SELECT * FROM utility_capacity{where} ORDER BY total_capacity_mw DESC", params
+    ).fetchall()
+    result = [dict(r) for r in rows]
+
+    if should_close:
+        conn.close()
+    return result
+
+
+def get_rate_case_impacts(conn: Optional[sqlite3.Connection] = None) -> list[dict]:
+    """Get all rate case consumer impact records."""
+    should_close = conn is None
+    if conn is None:
+        conn = get_connection()
+
+    rows = conn.execute(
+        "SELECT * FROM rate_case_impacts ORDER BY abs(monthly_bill_impact) DESC"
+    ).fetchall()
+    result = [dict(r) for r in rows]
+
+    if should_close:
+        conn.close()
+    return result
+
+
+def get_enrichment_stats(conn: Optional[sqlite3.Connection] = None) -> dict:
+    """Get statistics about enrichment data."""
+    should_close = conn is None
+    if conn is None:
+        conn = get_connection()
+
+    stats = {}
+
+    row = conn.execute("SELECT COUNT(*) as cnt FROM utility_operations").fetchone()
+    stats["utility_operations"] = row["cnt"]
+
+    row = conn.execute("SELECT COUNT(*) as cnt FROM utility_eia_links").fetchone()
+    stats["eia_links"] = row["cnt"]
+
+    row = conn.execute("SELECT COUNT(*) as cnt FROM utility_emissions").fetchone()
+    stats["emissions_records"] = row["cnt"]
+
+    row = conn.execute("SELECT COUNT(*) as cnt FROM utility_capacity").fetchone()
+    stats["capacity_records"] = row["cnt"]
+
+    row = conn.execute("SELECT COUNT(*) as cnt FROM rate_case_impacts").fetchone()
+    stats["impact_records"] = row["cnt"]
+
+    row = conn.execute(
+        "SELECT COUNT(DISTINCT eia_utility_id) as cnt FROM utility_operations"
+    ).fetchone()
+    stats["unique_eia_utilities"] = row["cnt"]
+
+    row = conn.execute(
+        "SELECT COUNT(DISTINCT eia_utility_id) as cnt FROM utility_eia_links"
+    ).fetchone()
+    stats["linked_utilities"] = row["cnt"]
+
+    if should_close:
+        conn.close()
+
+    return stats

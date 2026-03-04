@@ -347,19 +347,63 @@ def normalize_status(raw_status: str) -> CaseStatus:
 # --- Revenue Context Extraction ---
 
 
-_REVENUE_REQUEST_RE = re.compile(
-    r'(?:request(?:ed|ing)?|seek(?:s|ing)?|propos(?:ed|ing)?)\s+'
-    r'(?:a\s+)?(?:revenue\s+)?(?:increase|decrease|change)\s+'
-    r'(?:of\s+)?\$\s*([\d,]+(?:\.\d+)?)\s*(million|billion|M|B)?',
-    re.IGNORECASE
-)
+# Multiple patterns tried in order for revenue requests
+_REVENUE_REQUEST_PATTERNS = [
+    # "requesting revenue increase of $X million"
+    re.compile(
+        r'(?:request(?:ed|ing)?|seek(?:s|ing)?|propos(?:ed|ing)?)\s+'
+        r'(?:a\s+)?(?:revenue\s+)?(?:increase|decrease|change)\s+'
+        r'(?:of\s+)?\$\s*([\d,]+(?:\.\d+)?)\s*(million|billion|M|B)?',
+        re.IGNORECASE
+    ),
+    # "increase revenue requirements by $X billion"
+    re.compile(
+        r'(?:increase|decrease|change)\s+(?:its?\s+)?'
+        r'(?:authorized\s+)?(?:revenue\s+)?(?:requirements?|revenues?)\s+'
+        r'(?:by\s+)?\$\s*([\d,]+(?:\.\d+)?)\s*(million|billion|M|B)?',
+        re.IGNORECASE
+    ),
+    # "revenue increase of $X million"
+    re.compile(
+        r'revenue\s+(?:increase|decrease|change)\s+'
+        r'(?:of\s+)?\$\s*([\d,]+(?:\.\d+)?)\s*(million|billion|M|B)?',
+        re.IGNORECASE
+    ),
+    # "rate increase of $X million" / "rate increase requesting $X million"
+    re.compile(
+        r'rate\s+increase\s+(?:of\s+|requesting\s+)?\$\s*([\d,]+(?:\.\d+)?)\s*(million|billion|M|B)?',
+        re.IGNORECASE
+    ),
+    # "$X million revenue increase" / "$X billion over N years"
+    re.compile(
+        r'\$\s*([\d,]+(?:\.\d+)?)\s*(million|billion|M|B)\s+'
+        r'(?:revenue\s+)?(?:increase|decrease|change|over)',
+        re.IGNORECASE
+    ),
+    # "requesting $X million" (simple)
+    re.compile(
+        r'(?:request(?:ed|ing)?|seek(?:s|ing)?)\s+'
+        r'(?:a\s+(?:total\s+)?(?:revenue\s+)?(?:increase|decrease)\s+of\s+)?'
+        r'\$\s*([\d,]+(?:\.\d+)?)\s*(million|billion|M|B)',
+        re.IGNORECASE
+    ),
+]
 
-_REVENUE_APPROVED_RE = re.compile(
-    r'(?:approv(?:ed|ing)|authoriz(?:ed|ing)|grant(?:ed|ing))\s+'
-    r'(?:a\s+)?(?:revenue\s+)?(?:increase|decrease|change)\s+'
-    r'(?:of\s+)?\$\s*([\d,]+(?:\.\d+)?)\s*(million|billion|M|B)?',
-    re.IGNORECASE
-)
+_REVENUE_APPROVED_PATTERNS = [
+    # "approved revenue increase of $X million"
+    re.compile(
+        r'(?:approv(?:ed|ing)|authoriz(?:ed|ing)|grant(?:ed|ing))\s+'
+        r'(?:a\s+)?(?:revenue\s+)?(?:increase|decrease|change)\s+'
+        r'(?:of\s+)?\$\s*([\d,]+(?:\.\d+)?)\s*(million|billion|M|B)?',
+        re.IGNORECASE
+    ),
+    # "approved $X million"
+    re.compile(
+        r'(?:approv(?:ed|ing)|authoriz(?:ed|ing)|grant(?:ed|ing))\s+'
+        r'\$\s*([\d,]+(?:\.\d+)?)\s*(million|billion|M|B)',
+        re.IGNORECASE
+    ),
+]
 
 _ROE_RE = re.compile(
     r'(?:return\s+on\s+equity|ROE)\s+(?:of\s+)?'
@@ -377,9 +421,10 @@ def extract_revenue_request(text: str) -> Optional[float]:
     """Extract the requested revenue change amount from text (in $M)."""
     if not text:
         return None
-    match = _REVENUE_REQUEST_RE.search(text)
-    if match:
-        return _parse_matched_amount(match)
+    for pattern in _REVENUE_REQUEST_PATTERNS:
+        match = pattern.search(text)
+        if match:
+            return _parse_matched_amount(match)
     return None
 
 
@@ -387,9 +432,10 @@ def extract_revenue_approved(text: str) -> Optional[float]:
     """Extract the approved revenue change amount from text (in $M)."""
     if not text:
         return None
-    match = _REVENUE_APPROVED_RE.search(text)
-    if match:
-        return _parse_matched_amount(match)
+    for pattern in _REVENUE_APPROVED_PATTERNS:
+        match = pattern.search(text)
+        if match:
+            return _parse_matched_amount(match)
     return None
 
 
@@ -509,6 +555,10 @@ def parse_raw_record(raw: dict[str, Any]) -> Optional[dict]:
             roe = extract_roe(description)
         if rate_base is None:
             rate_base = extract_rate_base(description)
+        # Fallback: if still no requested revenue, try generic dollar extraction
+        # (for descriptions that just mention "$X million" without specific verbs)
+        if requested_rev is None:
+            requested_rev = extract_dollar_amount(description)
 
     return {
         "docket_number": docket_number,

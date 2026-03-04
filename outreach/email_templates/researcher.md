@@ -2,7 +2,7 @@
 
 **Subject Line Options:**
 - Open-source cross-state utility rate case dataset — potential research collaboration
-- Structured PUC rate case data across 5 states — would this be useful for your work?
+- Structured PUC rate case data across 4 states — would this be useful for your work?
 - New public dataset: utility rate case decisions normalized across state PUCs
 
 ---
@@ -16,7 +16,7 @@ Dear [RESEARCHER_NAME],
 
 I've been following your work on [SPECIFIC_RESEARCH_AREA] at [INSTITUTION], particularly [SPECIFIC_PAPER_OR_PROJECT]. Your research on [TOPIC] is one of the reasons I built this dataset.
 
-I'm building the **PUC Rate Case Tracker**, a structured, open database of utility rate case filings and decisions across state public utility commissions. The project currently covers 5 states (Pennsylvania, California, Oregon, Indiana, and Washington) with 44 rate cases normalized into a consistent schema, and I'm actively expanding coverage.
+I'm building the **PUC Rate Case Tracker**, a structured, open database of utility rate case filings and decisions across state public utility commissions. The project currently covers 4 states (Missouri, Oregon, Connecticut, and Georgia) with 1,294 rate cases normalized into a consistent schema, and I'm actively expanding coverage.
 
 **The core problem this addresses:** Rate case data is locked inside individual state PUC docket systems, each with different filing formats, search interfaces, and data structures. Researchers who want to do cross-state comparative analysis of utility regulation have to manually dig through each state's system. There is no free, structured, cross-state database of rate case decisions — the only existing option is S&P Global's Regulatory Research Associates platform, which costs thousands of dollars per year.
 
@@ -43,7 +43,7 @@ Best regards,
 
 Nathan Goldberg
 nathanmauricegoldberg@gmail.com
-linkedin.com/in/nathanmauricegoldberg
+https://www.linkedin.com/in/nathan-goldberg-62a44522a/
 
 ---
 

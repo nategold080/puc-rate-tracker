@@ -6,15 +6,16 @@ This dataset aggregates utility rate case filings and decisions from state publi
 
 ## Data Sources
 
-| Source | Records | System | URL |
-|--------|---------|--------|-----|
-| Oregon PUC | 582 | EDOCKETS search | apps.puc.state.or.us/edockets/ |
-| Pennsylvania PUC | 19 | Document search | www.puc.pa.gov |
-| California CPUC | 10 | CPUC Proceedings | apps.cpuc.ca.gov/apex/f?p=401 |
-| Indiana IURC | 5 | Online docket | iurc.portal.in.gov |
-| Washington UTC | 5 | Open docket | www.utc.wa.gov/casedocket |
+| Source | Records | System | Scraping Method | URL |
+|--------|---------|--------|-----------------|-----|
+| Missouri PSC | 590 | EFIS case detail | Live scraped (ID enumeration) | efis.psc.mo.gov |
+| Oregon PUC | 582 | EDOCKETS search | Live scraped (POST search) | apps.puc.state.or.us/edockets/ |
+| Connecticut PURA | 114 | Lotus Notes/Domino | Live scraped (SearchView + OpenView) | www.dpuc.state.ct.us |
+| Georgia PSC | 8 | FACTS docket | Live scraped (major cases + docket pages) | psc.ga.gov |
 
-### Oregon PUC (Primary Source — Live Scraped)
+Four additional states have scraper stubs but do not yet produce real data due to JavaScript-heavy interfaces or access restrictions: Pennsylvania PUC, California CPUC, Indiana IURC, and Washington UTC. See PROBLEMS.md P26 for details.
+
+### Oregon PUC (Live Scraped)
 
 The Oregon PUC EDOCKETS system provides accessible HTML search results for rate cases. The scraper submits a POST request to `apps.puc.state.or.us/edockets/srchlist.asp` with `case_type=rate` and parses the returned HTML table. Each row yields:
 
@@ -25,9 +26,21 @@ The Oregon PUC EDOCKETS system provides accessible HTML search results for rate 
 
 Results are deduplicated by docket number and cached as JSON for subsequent runs.
 
-### Other State Sources
+### Missouri PSC (Live Scraped)
 
-Pennsylvania, California, Indiana, and Washington PUCs use JavaScript-heavy search interfaces that require browser-based rendering. For these states, the database currently contains structured records based on publicly filed rate cases. As PUC interfaces evolve or provide API access, live scraping will be extended.
+The Missouri PSC EFIS system renders case detail pages as server-side HTML. The scraper enumerates known case ID ranges for electric (ER), gas (GR), and water (WR) rate cases, plus known 2024+ case IDs. Each page is parsed for case number, utility name (from Subject Companies section), status, filing date, and case type.
+
+### Connecticut PURA (Live Scraped)
+
+The Connecticut PURA uses a Lotus Notes/Domino docket system. The scraper searches for rate-related keywords via SearchView, extracts bracket-format docket references [YY-MM-NN], and browses the docket listing via ExpandView to collect titles. Rate cases are filtered using utility name matching and rate-related keyword validation.
+
+### Georgia PSC (Live Scraped)
+
+The Georgia PSC FACTS system provides a major cases listing page. The scraper discovers docket IDs from that page, expands the search to nearby IDs, and fetches individual docket pages for titles. Only pages containing rate case keywords are retained.
+
+### Planned State Sources
+
+Pennsylvania, California, Indiana, and Washington PUCs use JavaScript-heavy search interfaces that require browser-based rendering. Scraper stubs exist for these states but do not yet produce real data. As PUC interfaces evolve, provide API access, or browser automation (Selenium/Playwright) is added, live scraping will be extended to these states.
 
 ## Entity Resolution
 
@@ -71,21 +84,24 @@ Utility service type is determined from docket number prefixes and keyword match
 
 ## Quality Scoring
 
-Each rate case record receives a quality score from 0.0 to 1.0:
+Each rate case record receives a quality score from 0.0 to 1.0 based on 12 weighted components:
 
 | Component | Weight | Criteria |
 |-----------|--------|----------|
-| Docket number | 0.15 | Docket number is present |
-| Utility name resolved | 0.15 | Canonical name assigned (full credit) or raw name present (partial) |
-| Case type classified | 0.10 | Case type is not "unknown" |
-| Filing date | 0.10 | Filing date is present |
-| Decision date | 0.10 | Decision date present; partial credit for active cases |
-| Revenue request amount | 0.15 | Requested revenue change amount available |
-| Revenue approved amount | 0.15 | Approved revenue change amount available |
+| Docket number | 0.12 | Docket number is present |
+| Utility name resolved | 0.10 | Canonical name assigned (full credit) or raw name present (partial) |
+| Case type classified | 0.08 | Case type is not "unknown" |
+| Filing date | 0.08 | Filing date is present |
+| Decision date | 0.08 | Decision date present; partial credit for active cases |
+| Revenue request amount | 0.12 | Requested revenue change amount available |
+| Revenue approved amount | 0.12 | Approved revenue change amount available |
 | Case status | 0.05 | Status is not "unknown" |
 | Source URL | 0.05 | Direct URL to source document |
+| EIA data linked | 0.10 | Utility cross-linked to EIA utility ID |
+| Emissions data | 0.05 | EPA eGRID emissions data available for this utility |
+| Customer impact | 0.05 | Consumer bill impact estimate calculated |
 
-Current performance: Average score 0.670, 100% of records above 0.6 threshold.
+Current performance: Average score 0.677, 100% of records above 0.6 threshold.
 
 ## Data Validation
 
@@ -98,18 +114,20 @@ Current performance: Average score 0.670, 100% of records above 0.6 threshold.
 
 ## Coverage
 
-- **States:** 5 (OR, PA, CA, IN, WA)
-- **Total rate cases:** 621
-- **Unique utilities:** 467
-- **Date range:** 1990 to 2024
+- **States with real data:** 4 (MO, OR, CT, GA)
+- **States in development:** 4 additional (PA, CA, IN, WA) — scraper stubs exist but produce 0 records
+- **Total rate cases:** 1,294
+- **Live-scraped sources:** 4 (MO PSC, OR PUC, CT PURA, GA PSC)
+- **Date range:** 1990 to 2026
 - **Cases with revenue data:** 39 (from states providing financial details)
 - **Total revenue requested:** $23.0B across tracked cases
 - **Total revenue approved:** $10.5B across tracked cases
 - **Average ROE:** 10.39%
+- **Average quality score:** 0.677
 
 ## Limitations
 
-1. **JavaScript-rendered PUC sites.** Many state PUC websites (PA, CA, IN, WA) use dynamic JavaScript rendering that prevents simple HTTP scraping. Live data collection is currently limited to Oregon PUC, with other states using structured reference data.
+1. **JavaScript-rendered PUC sites.** Some state PUC websites (PA, CA, IN) use dynamic JavaScript rendering that prevents simple HTTP scraping. WA UTC returns 403 Forbidden. Currently only four states (MO, OR, CT, GA) have working live scrapers; four additional states (PA, CA, IN, WA) have scraper stubs but do not yet produce real data.
 
 2. **Financial data availability varies.** Revenue request/approval amounts require parsing detailed filings or order documents, which are often PDFs. The current pipeline extracts docket-level metadata; financial data enrichment is an ongoing effort.
 

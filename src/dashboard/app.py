@@ -165,6 +165,12 @@ def load_data():
             df["filing_date"] = pd.to_datetime(df["filing_date"], errors="coerce")
             df["decision_date"] = pd.to_datetime(df["decision_date"], errors="coerce")
             df["display_name"] = df["canonical_utility_name"].fillna(df["utility_name"])
+            # Clean case_type for display
+            if "case_type" in df.columns:
+                df["case_type_display"] = df["case_type"].apply(_clean_case_type)
+            # Clean HTML from descriptions
+            if "description" in df.columns:
+                df["description"] = df["description"].apply(_strip_html)
 
         ops_df = pd.DataFrame(operations) if operations else pd.DataFrame()
         emi_df = pd.DataFrame(emissions) if emissions else pd.DataFrame()
@@ -246,6 +252,60 @@ PLOTLY_LAYOUT = dict(
 
 BLUE_PALETTE = ["#0984E3", "#74B9FF", "#0056A8", "#A3D8F4", "#003D73", "#B8E6FF"]
 
+# Human-readable case type mapping
+CASE_TYPE_LABELS = {
+    "general_rate_case": "General Rate Case",
+    "rate_case": "Rate Case",
+    "rate_increase": "Rate Increase",
+    "rate_decrease": "Rate Decrease",
+    "fuel_adjustment": "Fuel Adjustment",
+    "fuel_cost_adjustment": "Fuel Cost Adjustment",
+    "purchased_gas": "Purchased Gas",
+    "purchased_gas_adjustment": "Purchased Gas Adjustment",
+    "tariff_change": "Tariff Change",
+    "base_rate": "Base Rate",
+    "base_rate_case": "Base Rate Case",
+    "infrastructure_rider": "Infrastructure Rider",
+    "decoupling": "Decoupling",
+    "energy_efficiency": "Energy Efficiency",
+    "renewable_energy": "Renewable Energy",
+    "storm_cost_recovery": "Storm Cost Recovery",
+    "transmission": "Transmission",
+    "distribution": "Distribution",
+    "water_rate_case": "Water Rate Case",
+    "gas_rate_case": "Gas Rate Case",
+    "electric_rate_case": "Electric Rate Case",
+    "complaint": "Complaint",
+    "investigation": "Investigation",
+    "merger_acquisition": "Merger/Acquisition",
+    "certificate": "Certificate",
+    "other": "Other",
+}
+
+
+def _clean_case_type(val):
+    """Convert internal case_type to human-readable label."""
+    if pd.isna(val) or not val:
+        return "Unknown"
+    s = str(val).strip()
+    if s in CASE_TYPE_LABELS:
+        return CASE_TYPE_LABELS[s]
+    return s.replace("_", " ").title()
+
+
+def _strip_html(text):
+    """Remove HTML tags and entities from text."""
+    if not text or pd.isna(text):
+        return text
+    import re
+    from html import unescape
+    clean = re.sub(r"<[^>]+>", "", str(text))
+    # Decode HTML entities (&nbsp; &amp; &#39; etc.)
+    clean = unescape(clean)
+    # Collapse whitespace
+    clean = re.sub(r"\s+", " ", clean).strip()
+    return clean if clean else None
+
 
 # ============================================================
 # SECTION 1: NATIONAL OVERVIEW
@@ -273,15 +333,25 @@ if section == "National Overview":
         total_requested = fin.get("total_requested_M", 0)
         avg_roe = fin.get("avg_roe_pct", 0)
         active_cases = len(df[df["status"] == "active"])
+        decided_cases = len(df[df["status"] == "decided"])
 
         with col1:
-            st.markdown(make_kpi_card(f"{total_cases}", "Total Rate Cases"), unsafe_allow_html=True)
+            st.markdown(make_kpi_card(f"{total_cases:,}", "Total Rate Cases"), unsafe_allow_html=True)
         with col2:
             st.markdown(make_kpi_card(f"{states_covered}", "States Tracked"), unsafe_allow_html=True)
         with col3:
-            st.markdown(make_kpi_card(f"${total_requested:,.0f}M", "Total Requested"), unsafe_allow_html=True)
+            # Show decided cases instead of $0M when financial data is sparse
+            if total_requested and total_requested > 0:
+                st.markdown(make_kpi_card(f"${total_requested:,.0f}M", "Total Requested"), unsafe_allow_html=True)
+            else:
+                st.markdown(make_kpi_card(f"{decided_cases:,}", "Cases Decided"), unsafe_allow_html=True)
         with col4:
-            st.markdown(make_kpi_card(f"{avg_roe:.1f}%", "Avg ROE"), unsafe_allow_html=True)
+            if avg_roe and avg_roe > 0:
+                st.markdown(make_kpi_card(f"{avg_roe:.1f}%", "Avg ROE"), unsafe_allow_html=True)
+            else:
+                # Show unique utilities instead of 0% ROE
+                n_utilities = df["display_name"].nunique()
+                st.markdown(make_kpi_card(f"{n_utilities:,}", "Utilities Tracked"), unsafe_allow_html=True)
         with col5:
             st.markdown(make_kpi_card(f"{active_cases}", "Active Cases"), unsafe_allow_html=True)
 
@@ -348,7 +418,10 @@ elif section == "Rate Case Explorer":
             selected_state = st.selectbox("State", states)
 
         with col2:
-            types = ["All"] + sorted(df["case_type"].dropna().unique().tolist())
+            if "case_type_display" in df.columns:
+                types = ["All"] + sorted(df["case_type_display"].dropna().unique().tolist())
+            else:
+                types = ["All"] + sorted(df["case_type"].dropna().unique().tolist())
             selected_type = st.selectbox("Case Type", types)
 
         with col3:
@@ -368,7 +441,8 @@ elif section == "Rate Case Explorer":
         if selected_state != "All":
             filtered = filtered[filtered["state"] == selected_state]
         if selected_type != "All":
-            filtered = filtered[filtered["case_type"] == selected_type]
+            ct_col = "case_type_display" if "case_type_display" in filtered.columns else "case_type"
+            filtered = filtered[filtered[ct_col] == selected_type]
         if selected_status != "All":
             filtered = filtered[filtered["status"] == selected_status]
         if selected_utility_type != "All":
@@ -383,25 +457,30 @@ elif section == "Rate Case Explorer":
 
         st.markdown(f"**{len(filtered)} rate cases found**")
 
-        # Display table
+        # Display table — format dates and case types for readability
+        display_df = filtered.copy()
+        display_df["filing_date_str"] = display_df["filing_date"].dt.strftime("%Y-%m-%d").fillna("")
+        display_df["decision_date_str"] = display_df["decision_date"].dt.strftime("%Y-%m-%d").fillna("")
+        case_type_col = "case_type_display" if "case_type_display" in display_df.columns else "case_type"
+
         display_cols = [
-            "docket_number", "display_name", "state", "case_type", "utility_type",
-            "status", "filing_date", "decision_date",
+            "docket_number", "display_name", "state", case_type_col, "utility_type",
+            "status", "filing_date_str", "decision_date_str",
             "requested_revenue_change", "approved_revenue_change",
             "return_on_equity", "quality_score",
         ]
-        available_cols = [c for c in display_cols if c in filtered.columns]
+        available_cols = [c for c in display_cols if c in display_df.columns]
 
         st.dataframe(
-            filtered[available_cols].rename(columns={
+            display_df[available_cols].rename(columns={
                 "docket_number": "Docket",
                 "display_name": "Utility",
                 "state": "State",
-                "case_type": "Type",
+                case_type_col: "Type",
                 "utility_type": "Service",
                 "status": "Status",
-                "filing_date": "Filed",
-                "decision_date": "Decided",
+                "filing_date_str": "Filed",
+                "decision_date_str": "Decided",
                 "requested_revenue_change": "Requested ($M)",
                 "approved_revenue_change": "Approved ($M)",
                 "return_on_equity": "ROE (%)",
@@ -500,7 +579,10 @@ elif section == "Rate Change Tracker":
     else:
         rev_df = df.dropna(subset=["requested_revenue_change"]).copy()
 
-        if not rev_df.empty:
+        if rev_df.empty:
+            st.info("Revenue change data is not yet available for the currently tracked rate cases. "
+                    "Financial details (requested and approved revenue changes) will appear here as they are extracted from docket filings.")
+        elif not rev_df.empty:
             # Scatter: requested vs approved
             st.subheader("Requested vs. Approved Revenue Change")
             scatter_df = rev_df.dropna(subset=["approved_revenue_change"])
@@ -585,7 +667,8 @@ elif section == "Utility Profiles":
     )
 
     if ops_df.empty:
-        st.warning("No EIA 861 data loaded. Run: `python3 -m src.cli enrich`")
+        st.info("EIA Form 861 utility profile data is not yet available for this deployment. "
+                "This section will show customer counts, revenue, and pricing data once enrichment data is loaded.")
     else:
         # KPIs
         col1, col2, col3, col4 = st.columns(4)
@@ -647,7 +730,8 @@ elif section == "Consumer Impact":
     )
 
     if imp_df.empty:
-        st.warning("No impact data. Run: `python3 -m src.cli enrich`")
+        st.info("Consumer impact analysis is not yet available for this deployment. "
+                "This section will show rate case effects on customer bills once enrichment data is loaded.")
     else:
         # KPIs
         col1, col2, col3 = st.columns(3)
@@ -705,7 +789,8 @@ elif section == "Environmental Impact":
     )
 
     if emi_df.empty:
-        st.warning("No eGRID data. Run: `python3 -m src.cli enrich`")
+        st.info("EPA eGRID emissions data is not yet available for this deployment. "
+                "This section will show utility emissions and generation mix once enrichment data is loaded.")
     else:
         # KPIs
         col1, col2, col3, col4 = st.columns(4)
@@ -782,7 +867,8 @@ elif section == "Capacity & Infrastructure":
     )
 
     if cap_df.empty:
-        st.warning("No EIA 860 data. Run: `python3 -m src.cli enrich`")
+        st.info("EIA Form 860 capacity data is not yet available for this deployment. "
+                "This section will show generation fleet analysis once enrichment data is loaded.")
     else:
         # KPIs
         col1, col2, col3, col4 = st.columns(4)
@@ -1051,8 +1137,9 @@ elif section == "Case Deep Dive":
                     st.markdown(f"**Docket:** {case_row.get('docket_number', 'N/A')}")
                     st.markdown(f"**State:** {case_row.get('state', 'N/A')}")
                     st.markdown(f"**Source:** {case_row.get('source', 'N/A')}")
-                    if case_row.get("description"):
-                        st.markdown(f"**Description:** {case_row['description']}")
+                    desc = case_row.get("description")
+                    if desc and str(desc).strip():
+                        st.markdown(f"**Description:** {desc}")
                     if case_row.get("source_url"):
                         st.markdown(f"**Source URL:** [{case_row['source_url']}]({case_row['source_url']})")
 
@@ -1060,9 +1147,11 @@ elif section == "Case Deep Dive":
                     quality = case_row.get("quality_score")
                     if quality is not None:
                         st.metric("Quality Score", f"{quality:.3f}")
-                    st.metric("Status", case_row.get("status", "Unknown"))
-                    st.metric("Case Type", case_row.get("case_type", "Unknown"))
-                    st.metric("Utility Type", case_row.get("utility_type", "Unknown"))
+                    st.metric("Status", str(case_row.get("status", "Unknown")).replace("_", " ").title())
+                    ct = case_row.get("case_type_display") or _clean_case_type(case_row.get("case_type"))
+                    st.metric("Case Type", ct)
+                    ut = case_row.get("utility_type", "Unknown")
+                    st.metric("Utility Type", str(ut).replace("_", " ").title() if ut else "Unknown")
 
                 st.markdown("---")
 
@@ -1071,10 +1160,10 @@ elif section == "Case Deep Dive":
                 col_d1, col_d2, col_d3 = st.columns(3)
                 with col_d1:
                     filing = case_row.get("filing_date")
-                    st.metric("Filing Date", str(filing)[:10] if pd.notna(filing) else "N/A")
+                    st.metric("Filing Date", filing.strftime("%Y-%m-%d") if pd.notna(filing) else "N/A")
                 with col_d2:
                     decision = case_row.get("decision_date")
-                    st.metric("Decision Date", str(decision)[:10] if pd.notna(decision) else "Pending")
+                    st.metric("Decision Date", decision.strftime("%Y-%m-%d") if pd.notna(decision) else "Pending")
                 with col_d3:
                     if pd.notna(filing) and pd.notna(decision):
                         duration = (decision - filing).days
@@ -1088,31 +1177,31 @@ elif section == "Case Deep Dive":
 
                 with col_f1:
                     req = case_row.get("requested_revenue_change")
-                    st.metric(
-                        "Requested Revenue Change",
-                        f"${req:,.1f}M" if pd.notna(req) else "N/A",
-                    )
+                    if pd.notna(req) and req != 0:
+                        st.metric("Requested Revenue Change", f"${req:,.1f}M")
+                    else:
+                        st.metric("Requested Revenue Change", "No data yet")
                 with col_f2:
                     app = case_row.get("approved_revenue_change")
-                    st.metric(
-                        "Approved Revenue Change",
-                        f"${app:,.1f}M" if pd.notna(app) else "Pending",
-                    )
+                    if pd.notna(app) and app != 0:
+                        st.metric("Approved Revenue Change", f"${app:,.1f}M")
+                    else:
+                        st.metric("Approved Revenue Change", "Pending")
                 with col_f3:
                     rb = case_row.get("rate_base")
-                    st.metric(
-                        "Rate Base",
-                        f"${rb:,.1f}M" if pd.notna(rb) else "N/A",
-                    )
+                    if pd.notna(rb) and rb != 0:
+                        st.metric("Rate Base", f"${rb:,.1f}M")
+                    else:
+                        st.metric("Rate Base", "No data yet")
                 with col_f4:
                     roe = case_row.get("return_on_equity")
-                    st.metric(
-                        "Return on Equity",
-                        f"{roe:.2f}%" if pd.notna(roe) else "N/A",
-                    )
+                    if pd.notna(roe) and roe != 0:
+                        st.metric("Return on Equity", f"{roe:.2f}%")
+                    else:
+                        st.metric("Return on Equity", "No data yet")
 
                 # Approval analysis
-                if pd.notna(req) and pd.notna(app) and req != 0:
+                if pd.notna(req) and pd.notna(app) and req != 0 and app != 0:
                     approval_pct = (app / req) * 100
                     st.markdown(f"**Approval Rate:** {approval_pct:.1f}% of requested amount")
 
@@ -1136,14 +1225,17 @@ elif section == "Case Deep Dive":
                     (df["display_name"] == utility_name) & (df["docket_number"] != selected_docket)
                 ]
                 if not other_cases.empty:
+                    other_disp = other_cases.copy()
+                    other_disp["filed_str"] = other_disp["filing_date"].dt.strftime("%Y-%m-%d").fillna("")
+                    ct_col = "case_type_display" if "case_type_display" in other_disp.columns else "case_type"
                     st.dataframe(
-                        other_cases[["docket_number", "state", "case_type", "status", "filing_date",
+                        other_disp[["docket_number", "state", ct_col, "status", "filed_str",
                                      "requested_revenue_change", "approved_revenue_change"]].rename(columns={
                             "docket_number": "Docket",
                             "state": "State",
-                            "case_type": "Type",
+                            ct_col: "Type",
                             "status": "Status",
-                            "filing_date": "Filed",
+                            "filed_str": "Filed",
                             "requested_revenue_change": "Requested ($M)",
                             "approved_revenue_change": "Approved ($M)",
                         }),

@@ -2,7 +2,7 @@
 
 **Subject Line Options:**
 - Cross-state utility rate case database — regulatory benchmarking data
-- Structured PUC rate case data across 5 states — potential data partnership
+- Structured PUC rate case data across 4 states — potential data partnership
 - Rate case decision tracking across state commissions — sample data available
 
 ---
@@ -16,7 +16,7 @@ Dear [CLIENT_NAME],
 
 I'm reaching out because [ORGANIZATION]'s work in [SPECIFIC_AREA — e.g., "utility regulatory strategy" / "rate case management" / "expert testimony"] requires exactly the kind of cross-jurisdictional rate case data that is surprisingly difficult to obtain.
 
-I've built the **PUC Rate Case Tracker**, a structured database of utility rate case filings and decisions across state public utility commissions. The current dataset covers 5 states — Pennsylvania, California, Oregon, Indiana, and Washington — with 44 normalized rate cases and growing.
+I've built the **PUC Rate Case Tracker**, a structured database of utility rate case filings and decisions across state public utility commissions. The current dataset covers 4 states — Missouri, Oregon, Connecticut, and Georgia — with 1,294 normalized rate cases and growing.
 
 **The problem this solves:**
 
@@ -46,7 +46,7 @@ Best regards,
 
 Nathan Goldberg
 nathanmauricegoldberg@gmail.com
-linkedin.com/in/nathanmauricegoldberg
+https://www.linkedin.com/in/nathan-goldberg-62a44522a/
 
 ---
 

@@ -15,10 +15,11 @@ Rate limiting: 2-second delay between requests, polite User-Agent.
 
 from __future__ import annotations
 
+import html as html_mod
 import json
 import re
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -289,7 +290,14 @@ def _parse_case_html(html: str, case_number: str, case_id: int) -> dict:
     )
     description = ""
     if style_match:
-        description = re.sub(r'<[^>]+>', '', style_match.group(1)).strip()
+        description = html_mod.unescape(re.sub(r'<[^>]+>', '', style_match.group(1)).strip())
+
+    # Enrich description with financial data from filing titles
+    if description and "$" not in description:
+        filing_titles = _extract_filing_titles(html)
+        financial_title = _best_financial_title(filing_titles)
+        if financial_title:
+            description = f"{description} | {financial_title}"
 
     # Try to extract filing date from first filing in the docket
     filing_date = _extract_filing_date(html)
@@ -306,8 +314,54 @@ def _parse_case_html(html: str, case_number: str, case_id: int) -> dict:
         "decision_date": decision_date,
         "description": description[:500] if description else None,
         "source_url": CASE_URL_TEMPLATE.format(case_id=case_id),
-        "scraped_at": datetime.utcnow().isoformat(),
+        "scraped_at": datetime.now(timezone.utc).isoformat(),
     }
+
+
+def _extract_filing_titles(html: str) -> list[str]:
+    """Extract all filing/document titles from the case page.
+
+    Filing titles appear as link text in anchors pointing to
+    /Case/FilingDisplay/{filing_id}.
+    """
+    pattern = re.compile(r'<a[^>]*href="/Case/FilingDisplay/\d+"[^>]*>([^<]+)</a>')
+    titles = []
+    for match in pattern.finditer(html):
+        title = html_mod.unescape(match.group(1).strip())
+        if title and len(title) > 5:
+            titles.append(title)
+    return titles
+
+
+# Keywords that signal a filing title contains financial / revenue data
+_FINANCIAL_KEYWORDS = re.compile(
+    r'(?:revenue|rate\s+increase|rate\s+decrease|increase|decrease|'
+    r'million|billion|\$)',
+    re.IGNORECASE,
+)
+
+
+def _best_financial_title(titles: list[str]) -> Optional[str]:
+    """Return the most relevant financial filing title, or None.
+
+    Prefers titles that contain an explicit dollar amount ('$'), then
+    falls back to titles mentioning revenue/increase/decrease language.
+    """
+    with_dollar: list[str] = []
+    with_keyword: list[str] = []
+
+    for title in titles:
+        if "$" in title:
+            with_dollar.append(title)
+        elif _FINANCIAL_KEYWORDS.search(title):
+            with_keyword.append(title)
+
+    # Prefer the first title with a dollar sign; fall back to keyword match
+    if with_dollar:
+        return with_dollar[0]
+    if with_keyword:
+        return with_keyword[0]
+    return None
 
 
 def _extract_companies(html: str) -> list[str]:
@@ -326,7 +380,7 @@ def _extract_companies(html: str) -> list[str]:
             r'(?:title="View"[^>]*>|>)\s*([A-Z][^<(]{3,60}?)\s*(?:<|\()',
         )
         for match in company_pattern.finditer(section):
-            name = match.group(1).strip()
+            name = html_mod.unescape(match.group(1).strip())
             if name and len(name) > 3:
                 # Clean up "d/b/a" format
                 dba_match = re.search(r'd/b/a\s+(.+)', name)
@@ -350,6 +404,7 @@ def _extract_companies(html: str) -> list[str]:
         html
     )
     for name in aria_matches:
+        name = html_mod.unescape(name)
         if name not in companies:
             companies.append(name)
 

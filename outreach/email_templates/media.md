@@ -1,7 +1,7 @@
 # Email Template: Energy Journalists
 
 **Subject Line Options:**
-- New open-source database tracks utility rate case decisions across 5 states
+- New open-source database tracks utility rate case decisions across 4 states
 - Data: How much are utilities asking for vs. what commissions approve?
 - Cross-state utility rate case tracker — structured data for your reporting
 
@@ -16,7 +16,7 @@ Hi [JOURNALIST_NAME],
 
 I've been reading your coverage of [SPECIFIC_TOPIC — e.g., "FERC and electricity markets" / "state utility regulation" / "the clean energy transition"], and I wanted to share a data resource that might be useful for your reporting.
 
-I've built the **PUC Rate Case Tracker**, an open-source database that normalizes utility rate case filings and decisions across state public utility commissions into a single, searchable, structured dataset. It currently covers Pennsylvania, California, Oregon, Indiana, and Washington, with 44 rate cases and growing.
+I've built the **PUC Rate Case Tracker**, an open-source database that normalizes utility rate case filings and decisions across state public utility commissions into a single, searchable, structured dataset. It currently covers 4 states — Missouri, Oregon, Connecticut, and Georgia — with 1,294 rate cases and growing.
 
 **Why this matters right now:**
 
@@ -30,7 +30,7 @@ Utility rate cases are one of the most consequential regulatory processes affect
 
 - **Rate case volume and timing:** Are utilities filing more frequently? Are cases taking longer to resolve? The data tracks filing and decision dates across jurisdictions.
 
-- **Cross-state comparison:** When Duke Energy files rate cases in both Indiana and the Carolinas, how do the outcomes compare? The tracker makes these comparisons possible for the first time in a structured format.
+- **Cross-state comparison:** How do PacifiCorp's rate case outcomes in Oregon compare with those in Washington? When the same utility faces different commissions, the tracker makes these comparisons possible for the first time in a structured format.
 
 The full dataset is available for download (CSV, JSON, Excel) and there's an interactive dashboard at [DASHBOARD_URL]. I'm happy to walk you through the data, provide custom exports for specific stories, or answer questions about the methodology.
 
@@ -40,7 +40,7 @@ Best,
 
 Nathan Goldberg
 nathanmauricegoldberg@gmail.com
-linkedin.com/in/nathanmauricegoldberg
+https://www.linkedin.com/in/nathan-goldberg-62a44522a/
 
 ---
 

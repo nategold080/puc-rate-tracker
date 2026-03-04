@@ -8,7 +8,7 @@ stored as floats (e.g., 10.5 for 10.5%).
 from __future__ import annotations
 
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from enum import Enum
 from typing import Optional
 
@@ -157,8 +157,8 @@ class RateCase(BaseModel):
     quality_score: Optional[float] = Field(None, ge=0.0, le=1.0, description="Data quality score 0.0-1.0")
 
     scraped_at: Optional[datetime] = Field(None, description="When data was last scraped")
-    created_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
-    updated_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
+    created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     @field_validator("state")
     @classmethod
@@ -282,7 +282,7 @@ class PipelineRun(BaseModel):
     records_created: int = Field(default=0, ge=0)
     records_updated: int = Field(default=0, ge=0)
     errors: int = Field(default=0, ge=0)
-    started_at: datetime = Field(default_factory=datetime.utcnow)
+    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     completed_at: Optional[datetime] = None
     notes: Optional[str] = None
 

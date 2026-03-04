@@ -4,9 +4,8 @@ Scrapes rate case docket data from the Pennsylvania Public Utility
 Commission document search system at https://www.puc.pa.gov/.
 
 PA PUC rate cases use docket prefix "R-" (e.g., R-2024-3046894).
-The PUC website uses JavaScript-heavy search, so we provide both:
-  1. An httpx-based scraper that attempts to parse search results
-  2. A seed-data fallback with realistic historical PA PUC rate cases
+The PUC website uses JavaScript-heavy search, so we attempt to parse
+search results via httpx. If scraping fails, returns an empty list.
 
 Rate limiting: 2-second delay between requests, polite User-Agent.
 """
@@ -16,7 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -55,8 +54,7 @@ def scrape_pa_puc(
     """Scrape Pennsylvania PUC rate case docket data.
 
     Attempts live scraping of the PA PUC website. If the site requires
-    JavaScript rendering or returns unusable responses, falls back to
-    seed data that covers known historical rate cases.
+    JavaScript rendering or returns unusable responses, returns an empty list.
 
     Args:
         start_year: Earliest year to scrape.
@@ -85,10 +83,10 @@ def scrape_pa_puc(
 
     if not records:
         console.print(
-            "[yellow]Live scraping returned no results. "
-            "PA PUC may require JS rendering. Using seed data.[/yellow]"
+            "[yellow]Live scraping returned no results for PA PUC. "
+            "Site may require JS rendering. Returning empty list.[/yellow]"
         )
-        records = _get_seed_data(start_year, end_year)
+        return []
 
     # Cache results
     with open(cache_file, "w") as f:
@@ -158,7 +156,7 @@ def _try_live_scrape(start_year: int, end_year: int) -> list[dict]:
                         "state": STATE,
                         "source": SOURCE_KEY,
                         "source_url": f"{BASE_URL}/pcdocs/search-results/?q={docket}",
-                        "scraped_at": datetime.utcnow().isoformat(),
+                        "scraped_at": datetime.now(timezone.utc).isoformat(),
                     }
                     records.append(record)
 
@@ -170,31 +168,3 @@ def _try_live_scrape(start_year: int, end_year: int) -> list[dict]:
         console.print(f"[yellow]Error scraping PA PUC: {e}[/yellow]")
 
     return records
-
-
-def _get_seed_data(start_year: int, end_year: int) -> list[dict]:
-    """Return realistic seed data for PA PUC rate cases.
-
-    These are based on real historical PA PUC rate case filings.
-    Docket numbers, utility names, and financial data are representative
-    of actual filings.
-    """
-    from scripts.seed_data import get_pa_puc_seed_data
-
-    all_records = get_pa_puc_seed_data()
-
-    # Filter by year range
-    filtered = []
-    for record in all_records:
-        filing_date = record.get("filing_date", "")
-        if filing_date:
-            try:
-                year = int(filing_date[:4])
-                if start_year <= year <= end_year:
-                    filtered.append(record)
-            except (ValueError, IndexError):
-                filtered.append(record)
-        else:
-            filtered.append(record)
-
-    return filtered

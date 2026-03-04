@@ -46,9 +46,15 @@ def minimal_case():
 
 class TestScoreRateCase:
     def test_complete_case_high_score(self, complete_case):
+        # Without enrichment data, max is ~0.80 (enrichment adds 0.20)
         result = score_rate_case(complete_case)
-        assert result["quality_score"] >= 0.9
+        assert result["quality_score"] >= 0.7
         assert len(result["issues"]) <= 1  # may lack source_url
+
+    def test_complete_case_with_enrichment(self, complete_case):
+        enrichment = {"has_eia_link": True, "has_emissions": True, "has_impact": True}
+        result = score_rate_case(complete_case, enrichment_data=enrichment)
+        assert result["quality_score"] >= 0.9
 
     def test_minimal_case_low_score(self, minimal_case):
         result = score_rate_case(minimal_case)

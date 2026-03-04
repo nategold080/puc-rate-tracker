@@ -3,16 +3,19 @@
 Each rate case record is scored 0.0 to 1.0 based on data completeness
 and validity. Components and weights per CLAUDE.md specification.
 
-Quality Score Weights:
-  - has_docket_number: 0.15
-  - has_utility_name_resolved: 0.15
-  - has_case_type_classified: 0.10
-  - has_filing_date: 0.10
-  - has_decision_date: 0.10
-  - has_revenue_request_amount: 0.15
-  - has_revenue_approved_amount: 0.15
+Quality Score Weights (12 components):
+  - has_docket_number: 0.12
+  - has_utility_name_resolved: 0.10
+  - has_case_type_classified: 0.08
+  - has_filing_date: 0.08
+  - has_decision_date: 0.08
+  - has_revenue_request_amount: 0.12
+  - has_revenue_approved_amount: 0.12
   - has_case_status: 0.05
   - has_source_url: 0.05
+  - has_eia_data_linked: 0.10
+  - has_emissions_data: 0.05
+  - has_customer_impact: 0.05
 
 Also performs referential integrity checks and data range validation.
 """
@@ -30,24 +33,32 @@ console = Console()
 # --- Quality Score Weights ---
 
 WEIGHTS = {
-    "has_docket_number": 0.15,
-    "has_utility_name_resolved": 0.15,
-    "has_case_type_classified": 0.10,
-    "has_filing_date": 0.10,
-    "has_decision_date": 0.10,
-    "has_revenue_request_amount": 0.15,
-    "has_revenue_approved_amount": 0.15,
+    "has_docket_number": 0.12,
+    "has_utility_name_resolved": 0.10,
+    "has_case_type_classified": 0.08,
+    "has_filing_date": 0.08,
+    "has_decision_date": 0.08,
+    "has_revenue_request_amount": 0.12,
+    "has_revenue_approved_amount": 0.12,
     "has_case_status": 0.05,
     "has_source_url": 0.05,
+    "has_eia_data_linked": 0.10,
+    "has_emissions_data": 0.05,
+    "has_customer_impact": 0.05,
 }
 
 
-def score_rate_case(record: dict[str, Any], document_count: int = 0) -> dict:
+def score_rate_case(
+    record: dict[str, Any],
+    document_count: int = 0,
+    enrichment_data: Optional[dict[str, Any]] = None,
+) -> dict:
     """Compute a quality score for a single rate case record.
 
     Args:
         record: Rate case dict with standard fields.
         document_count: Number of linked documents for this docket.
+        enrichment_data: Optional dict with keys 'has_eia_link', 'has_emissions', 'has_impact'.
 
     Returns:
         Dict with:
@@ -55,17 +66,20 @@ def score_rate_case(record: dict[str, Any], document_count: int = 0) -> dict:
           - component_scores: dict of each component's contribution
           - issues: list of quality issue descriptions
     """
+    if enrichment_data is None:
+        enrichment_data = {}
+
     components = {}
     issues = []
 
-    # 1. Docket number (0.15)
+    # 1. Docket number (0.12)
     if record.get("docket_number"):
         components["has_docket_number"] = 1.0
     else:
         components["has_docket_number"] = 0.0
         issues.append("Missing docket number")
 
-    # 2. Utility name resolved (0.15)
+    # 2. Utility name resolved (0.10)
     if record.get("canonical_utility_name"):
         components["has_utility_name_resolved"] = 1.0
     elif record.get("utility_name"):
@@ -74,7 +88,7 @@ def score_rate_case(record: dict[str, Any], document_count: int = 0) -> dict:
         components["has_utility_name_resolved"] = 0.0
         issues.append("Missing utility name")
 
-    # 3. Case type classified (0.10)
+    # 3. Case type classified (0.08)
     case_type = record.get("case_type", "unknown")
     if case_type and case_type != "unknown":
         components["has_case_type_classified"] = 1.0
@@ -82,14 +96,14 @@ def score_rate_case(record: dict[str, Any], document_count: int = 0) -> dict:
         components["has_case_type_classified"] = 0.0
         issues.append("Case type not classified")
 
-    # 4. Filing date (0.10)
+    # 4. Filing date (0.08)
     if record.get("filing_date"):
         components["has_filing_date"] = 1.0
     else:
         components["has_filing_date"] = 0.0
         issues.append("Missing filing date")
 
-    # 5. Decision date (0.10)
+    # 5. Decision date (0.08)
     if record.get("decision_date"):
         components["has_decision_date"] = 1.0
     else:
@@ -100,14 +114,14 @@ def score_rate_case(record: dict[str, Any], document_count: int = 0) -> dict:
             components["has_decision_date"] = 0.0
             issues.append("Missing decision date")
 
-    # 6. Revenue request amount (0.15)
+    # 6. Revenue request amount (0.12)
     if record.get("requested_revenue_change") is not None:
         components["has_revenue_request_amount"] = 1.0
     else:
         components["has_revenue_request_amount"] = 0.0
         issues.append("No revenue request amount")
 
-    # 7. Revenue approved amount (0.15)
+    # 7. Revenue approved amount (0.12)
     if record.get("approved_revenue_change") is not None:
         components["has_revenue_approved_amount"] = 1.0
     else:
@@ -126,6 +140,24 @@ def score_rate_case(record: dict[str, Any], document_count: int = 0) -> dict:
         components["has_source_url"] = 1.0
     else:
         components["has_source_url"] = 0.0
+
+    # 10. EIA data linked (0.10)
+    if enrichment_data.get("has_eia_link"):
+        components["has_eia_data_linked"] = 1.0
+    else:
+        components["has_eia_data_linked"] = 0.0
+
+    # 11. Emissions data (0.05)
+    if enrichment_data.get("has_emissions"):
+        components["has_emissions_data"] = 1.0
+    else:
+        components["has_emissions_data"] = 0.0
+
+    # 12. Customer impact (0.05)
+    if enrichment_data.get("has_impact"):
+        components["has_customer_impact"] = 1.0
+    else:
+        components["has_customer_impact"] = 0.0
 
     # Compute weighted total
     quality_score = sum(
@@ -307,17 +339,44 @@ def score_all_records(
 def validate_all() -> None:
     """Run quality validation on all records in the database.
 
-    Updates quality scores and logs issues.
+    Updates quality scores and logs issues. Includes enrichment data
+    for scoring when available.
     """
     from src.storage.database import (
         get_all_rate_cases,
         get_connection,
+        get_utility_eia_links,
+        get_rate_case_impacts,
+        get_utility_emissions,
         update_quality_scores,
     )
 
     conn = get_connection()
     cases = get_all_rate_cases(limit=10000, conn=conn)
     console.print(f"[dim]Validating {len(cases)} rate cases...[/dim]")
+
+    # Build enrichment lookup sets
+    try:
+        eia_links = get_utility_eia_links(conn=conn)
+        linked_utilities = {(l["utility_name"].lower(), l.get("state", "").upper()) for l in eia_links}
+        # Map (utility_name_lower, state) -> eia_utility_id for emissions lookup
+        linked_eia_ids = {(l["utility_name"].lower(), l.get("state", "").upper()): l["eia_utility_id"] for l in eia_links}
+    except Exception:
+        linked_utilities = set()
+        linked_eia_ids = {}
+
+    try:
+        impacts = get_rate_case_impacts(conn=conn)
+        impact_dockets = {(i["docket_number"], i["source"]) for i in impacts}
+    except Exception:
+        impact_dockets = set()
+
+    try:
+        emissions = get_utility_emissions(conn=conn)
+        # Build set of EIA utility IDs that have emissions data
+        emission_eia_ids = {e.get("eia_utility_id") for e in emissions if e.get("eia_utility_id")}
+    except Exception:
+        emission_eia_ids = set()
 
     scores = {}
     total_issues = 0
@@ -332,8 +391,19 @@ def validate_all() -> None:
         if errors:
             error_count += 1
 
+        # Build enrichment context
+        canonical = (case.get("canonical_utility_name") or case.get("utility_name", "")).lower()
+        state = (case.get("state") or "").upper()
+        # Check emissions per-utility via EIA ID, not per-state
+        eia_id = linked_eia_ids.get((canonical, state))
+        enrichment = {
+            "has_eia_link": (canonical, state) in linked_utilities,
+            "has_emissions": eia_id is not None and eia_id in emission_eia_ids,
+            "has_impact": (docket, source) in impact_dockets,
+        }
+
         # Score
-        result = score_rate_case(case)
+        result = score_rate_case(case, enrichment_data=enrichment)
         scores[(docket, source)] = result["quality_score"]
         total_issues += len(result["issues"])
 

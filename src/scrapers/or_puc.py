@@ -63,7 +63,8 @@ def scrape_or_puc(
     """Scrape Oregon PUC rate case data from EDOCKETS.
 
     Searches the EDOCKETS system for all rate cases and parses the
-    result table into structured records.
+    result table into structured records. Returns an empty list if
+    scraping fails.
     """
     if end_year is None:
         end_year = datetime.now().year
@@ -83,13 +84,10 @@ def scrape_or_puc(
     try:
         records = _fetch_rate_cases()
     except Exception as e:
-        console.print(f"[red]OR PUC scrape failed: {e}[/red]")
-        console.print("[yellow]Falling back to seed data...[/yellow]")
-        from scripts.seed_data import get_or_puc_seed_data
-        records = get_or_puc_seed_data()
-        with open(cache_file, "w") as f:
-            json.dump(records, f, indent=2, default=str)
-        return records
+        console.print(
+            f"[red]OR PUC scrape failed: {e}. Returning empty list.[/red]"
+        )
+        return []
 
     # Filter by year range
     filtered = []
@@ -114,7 +112,11 @@ def scrape_or_puc(
 
 
 def _fetch_rate_cases() -> list[dict]:
-    """Fetch rate case data from OR PUC EDOCKETS search."""
+    """Fetch rate case data from OR PUC EDOCKETS search.
+
+    Note: The EDOCKETS system contains legacy cases (pre-1997). Modern Oregon
+    rate cases (2000+) use a different docket system.
+    """
     headers = {
         "User-Agent": USER_AGENT,
         "Accept": "text/html",
@@ -134,7 +136,98 @@ def _fetch_rate_cases() -> list[dict]:
         response = client.post(url, data=form_data)
         response.raise_for_status()
 
-        return _parse_search_results(response.text)
+        cases = _parse_search_results(response.text)
+
+        # Fetch detail descriptions for a sample of cases with detail IDs
+        _fetch_detail_descriptions(client, cases)
+        return cases
+
+
+def _fetch_detail_descriptions(
+    client: httpx.Client, cases: list[dict]
+) -> None:
+    """Fetch docket detail pages to extract richer descriptions.
+
+    For each case with a detail_id, fetches the individual docket page and
+    looks for filing action descriptions — especially those containing
+    financial keywords like revenue amounts, rate increases, or dollar figures.
+
+    Modifies cases in place by setting the ``description`` field.
+    Limited to the first 50 cases with detail IDs to avoid excessive scraping.
+    """
+    FINANCIAL_KEYWORDS = re.compile(
+        r"(revenue|increase|decrease|\$|million|rate\s+change|rate\s+base)",
+        re.IGNORECASE,
+    )
+    DETAIL_URL = "https://apps.puc.state.or.us/edockets/docket.asp?DocketID={}"
+    MAX_DETAIL_FETCHES = 50
+
+    cases_with_detail = [c for c in cases if c.get("detail_id")]
+    to_fetch = cases_with_detail[:MAX_DETAIL_FETCHES]
+
+    if not to_fetch:
+        return
+
+    console.print(
+        f"[cyan]Fetching detail pages for {len(to_fetch)} OR PUC dockets...[/cyan]"
+    )
+
+    for i, case in enumerate(to_fetch):
+        detail_id = case["detail_id"]
+        url = DETAIL_URL.format(detail_id)
+
+        try:
+            resp = client.get(url)
+            resp.raise_for_status()
+            description = _extract_best_description(resp.text, FINANCIAL_KEYWORDS)
+            if description:
+                case["description"] = description
+        except Exception as e:
+            console.print(
+                f"[dim]Failed to fetch detail for {case.get('docket_number', detail_id)}: {e}[/dim]"
+            )
+
+        if i < len(to_fetch) - 1:
+            time.sleep(DELAY_SECONDS)
+
+    fetched_count = sum(1 for c in to_fetch if c.get("description"))
+    console.print(
+        f"[green]Extracted descriptions for {fetched_count}/{len(to_fetch)} dockets[/green]"
+    )
+
+
+def _extract_best_description(html: str, financial_pattern: re.Pattern) -> Optional[str]:
+    """Extract the most informative description from a docket detail page.
+
+    Parses the filing/action table on the detail page and returns the
+    description that best matches financial keywords. Falls back to the
+    longest description if none contain financial terms.
+    """
+    # Extract all table cell contents that look like descriptions
+    # Detail pages have tables with filing actions; descriptions tend to be
+    # in cells that are longer text strings (not dates or short codes).
+    cells = re.findall(r"<td[^>]*>(.*?)</td>", html, re.DOTALL)
+    descriptions: list[str] = []
+
+    for cell in cells:
+        text = re.sub(r"<[^>]+>", " ", cell).strip()
+        text = re.sub(r"\s+", " ", text).strip()
+        text = text.replace("&nbsp;", " ").replace("&amp;", "&")
+        # Filter to substantive text (skip dates, short codes, numbers-only)
+        if len(text) > 30 and not re.match(r"^[\d/\-\s]+$", text):
+            descriptions.append(text)
+
+    if not descriptions:
+        return None
+
+    # Prefer descriptions with financial keywords
+    financial_descs = [d for d in descriptions if financial_pattern.search(d)]
+    if financial_descs:
+        # Return the longest financial description (most detail)
+        return max(financial_descs, key=len)
+
+    # Fall back to longest description available
+    return max(descriptions, key=len)
 
 
 def _parse_search_results(html: str) -> list[dict]:
@@ -147,6 +240,19 @@ def _parse_search_results(html: str) -> list[dict]:
         cells = re.findall(r"<td[^>]*>(.*?)</td>", row, re.DOTALL)
         if len(cells) < 4:
             continue
+
+        # Extract detail_id from docket link before stripping HTML tags
+        # The DocketID link is in the utility name column (cells[1])
+        detail_id = None
+        for cell in cells[:3]:
+            detail_match = re.search(
+                r'<a[^>]+href=["\']?docket\.asp\?DocketID=(\d+)',
+                cell,
+                re.IGNORECASE,
+            )
+            if detail_match:
+                detail_id = detail_match.group(1)
+                break
 
         # Clean HTML tags from cells
         clean = [
@@ -190,6 +296,7 @@ def _parse_search_results(html: str) -> list[dict]:
             "case_type": "general_rate_case",
             "utility_type": utility_type,
             "status": "decided" if decision_date else "active",
+            "detail_id": detail_id,
         }
 
         cases.append(record)

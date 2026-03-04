@@ -13,10 +13,11 @@ Rate limiting: 2-second delay between requests, polite User-Agent.
 
 from __future__ import annotations
 
+import html as html_mod
 import json
 import re
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -223,6 +224,10 @@ def _fetch_rate_cases(start_year: int, end_year: int) -> list[dict]:
         if year is None or year < start_year or year > end_year:
             continue
 
+        # Skip placeholder docket numbers
+        if base in ("00-00-01", "00-00-00"):
+            continue
+
         if base in seen_base:
             continue
 
@@ -252,6 +257,13 @@ def _fetch_rate_cases(start_year: int, end_year: int) -> list[dict]:
         seen_base.add(base)
         utility_type = _classify_utility_type(combined)
 
+        # Clean HTML artifacts from description text
+        raw_desc = (title or context)[:500] if (title or context) else None
+        if raw_desc:
+            raw_desc = re.sub(r'<[^>]+>', '', raw_desc).strip()
+            raw_desc = html_mod.unescape(raw_desc)
+            raw_desc = re.sub(r'\s+', ' ', raw_desc).strip()
+
         records.append({
             "docket_number": base,
             "utility_name": utility_name,
@@ -261,9 +273,9 @@ def _fetch_rate_cases(start_year: int, end_year: int) -> list[dict]:
             "utility_type": utility_type,
             "status": "decided",
             "filing_date": _docket_to_filing_date(base),
-            "description": (title or context)[:500] if (title or context) else None,
+            "description": raw_desc if raw_desc else None,
             "source_url": f"{BASE_URL}/dockcurr.nsf/{VIEW_ID}?SearchView&Query=%5B{base}%5D",
-            "scraped_at": datetime.utcnow().isoformat(),
+            "scraped_at": datetime.now(timezone.utc).isoformat(),
         })
 
     return records
@@ -285,6 +297,7 @@ def _extract_docket_refs(html: str, docket_context: dict[str, str]) -> None:
         end = min(len(html), match.end() + 200)
         context = re.sub(r'<[^>]+>', ' ', html[start:end]).strip()
         context = re.sub(r'\s+', ' ', context)
+        context = html_mod.unescape(context)
 
         # Keep the longer context for each docket
         if docket_num not in docket_context or len(context) > len(docket_context[docket_num]):
@@ -308,7 +321,7 @@ def _extract_docket_refs(html: str, docket_context: dict[str, str]) -> None:
             start = max(0, match.start() - 200)
             end = min(len(html), match.end() + 200)
             context = re.sub(r'<[^>]+>', ' ', html[start:end]).strip()
-            docket_context[docket_num] = context
+            docket_context[docket_num] = html_mod.unescape(context)
 
 
 def _browse_docket_titles(client: httpx.Client) -> dict[str, str]:
@@ -353,7 +366,7 @@ def _browse_docket_titles(client: httpx.Client) -> dict[str, str]:
                     after,
                 )
                 if title_match:
-                    title = title_match.group(1).strip()
+                    title = html_mod.unescape(title_match.group(1).strip())
                     if title and len(title) > 5:
                         titles[docket_num] = title
 
